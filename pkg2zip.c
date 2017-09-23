@@ -301,7 +301,7 @@ int main(int argc, char* argv[])
     snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/head.bin", id);
 
     zip_begin_file(&z, path);
-    size_t head_offset = 0;
+    uint64_t head_offset = 0;
     while (head_size != 0)
     {
         uint8_t buffer[1 << 16];
