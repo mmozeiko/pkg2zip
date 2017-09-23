@@ -4,4 +4,4 @@ pkg2zip.exe
 *.o
 *.obj
 *.pdb
-
+*.zip
