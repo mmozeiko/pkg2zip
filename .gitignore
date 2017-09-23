@@ -1,0 +1,7 @@
+pkg2zip
+pkg2zip.exe
+*.d
+*.o
+*.obj
+*.pdb
+
