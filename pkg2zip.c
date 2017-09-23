@@ -128,7 +128,7 @@ static const char* get_region(const char* id)
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.0\n");
+    printf("pkg2zip v1.1\n");
     if (argc < 2 || argc > 3)
     {
         fatal("Usage: %s file.pkg [NoNpDrmKey]\n", argv[0]);
@@ -301,13 +301,15 @@ int main(int argc, char* argv[])
     snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/head.bin", id);
 
     zip_begin_file(&z, path);
+    size_t head_offset = 0;
     while (head_size != 0)
     {
         uint8_t buffer[1 << 16];
         uint32_t size = (uint32_t)min64(head_size, sizeof(buffer));
-        sys_read(pkg, 0, buffer, size);
+        sys_read(pkg, head_offset, buffer, size);
         zip_write_file(&z, buffer, size);
         head_size -= size;
+        head_offset += size;
     }
     zip_end_file(&z);
 
