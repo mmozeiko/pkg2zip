@@ -24,6 +24,10 @@ If you have license key (32 hex characters) you can execute `pkg2zip package.pkg
 
 Get latest Windows binaries [here](https://github.com/mmozeiko/pkg2zip/releases).
 
+ArchLinux users can build binary with [pkg2zip](https://aur.archlinux.org/packages/pkg2zip/) package in AUR repository. For example, with pacaur:
+
+    $ pacaur -S pkg2zip
+
 # Building
 
 Execute `make` if you are on GNU/Linux or macOS.
