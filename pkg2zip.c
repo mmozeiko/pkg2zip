@@ -116,7 +116,7 @@ static const char* get_region(const char* id)
         return "JPN";
     }
     else if (memcmp(id, "VCAS", 4) == 0 || memcmp(id, "PCSH", 4) == 0 ||
-             memcmp(id, "VLAS", 4) == 0)
+             memcmp(id, "VLAS", 4) == 0 || memcmp(id, "PCSD", 4) == 0)
     {
         return "ASA";
     }
