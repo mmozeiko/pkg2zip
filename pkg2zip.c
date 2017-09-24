@@ -249,9 +249,15 @@ int main(int argc, char* argv[])
     const char* id2 = id + 13;
 
     char path[1024];
-    snprintf(path, sizeof(path), ".~%.*s.zip", 9, id);
-
-    printf("[*] creating temporary '%s' archive\n", path);
+    if (dlc)
+    {
+        snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC].zip", title, id, get_region(id));
+    }
+    else
+    {
+        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, id, get_region(id));
+    }
+    printf("[*] creating '%s' archive\n", path);
 
     zip z;
     zip_create(&z, path);
@@ -405,7 +411,6 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    printf("[*] creating work.bin\n");
     if (dlc)
     {
         zip_add_folder(&z, "license/");
@@ -417,10 +422,12 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "license/addcont/%.9s/%s/", id, id2);
         zip_add_folder(&z, path);
 
+        printf("[*] creating DLC rif file\n");
         snprintf(path, sizeof(path), "license/addcont/%.9s/%s/6488b73b912a753a492e2714e9b38bc7.rif", id, id2);
     }
     else
     {
+        printf("[*] creating work.bin\n");
         snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/work.bin", id);
     }
 
@@ -439,21 +446,6 @@ int main(int argc, char* argv[])
     zip_end_file(&z);
 
     zip_close(&z);
-
-    snprintf(path, sizeof(path), ".~%.*s.zip", 9, id);
-
-    char target[1024];
-    if (dlc)
-    {
-        snprintf(target, sizeof(target), "%s [%.9s] [%s] [DLC].zip", title, id, get_region(id));
-    }
-    else
-    {
-        snprintf(target, sizeof(target), "%s [%.9s] [%s].zip", title, id, get_region(id));
-    }
-
-    printf("[*] renaming to '%s'\n", target);
-    sys_rename(path, target);
 
     printf("[*] done!\n");
 }

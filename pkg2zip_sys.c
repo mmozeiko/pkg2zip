@@ -75,19 +75,6 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
     }
 }
 
-void sys_rename(const char* src, const char* dst)
-{
-    WCHAR wsrc[MAX_PATH];
-    WCHAR wdst[MAX_PATH];
-    MultiByteToWideChar(CP_UTF8, 0, src, -1, wsrc, MAX_PATH);
-    MultiByteToWideChar(CP_UTF8, 0, dst, -1, wdst, MAX_PATH);
-
-    if (!MoveFileExW(wsrc, wdst, MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING))
-    {
-        fatal("ERROR: failed to rename '%s' to '%s'\n", src, dst);
-    }
-}
-
 #else
 
 #define _FILE_OFFSET_BITS 64
@@ -148,14 +135,6 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
     if (wrote != size)
     {
         fatal("ERROR: failed to read %u bytes from file\n", size);
-    }
-}
-
-void sys_rename(const char* src, const char* dst)
-{
-    if (rename(src, dst) != 0)
-    {
-        fatal("ERROR: failed to rename '%s' to '%s'\n", src, dst);
     }
 }
 
