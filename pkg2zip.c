@@ -8,95 +8,103 @@
 #include <string.h>
 #include <stdio.h>
 
-static const uint8_t pkg_psp_key[] = {
-    0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d, 0x2c, 0x33, 0x81, 0x8d, 0x70, 0x9b, 0x60, 0xe6, 0x2b,
-};
+#define PKG_HEADER_SIZE 192
+#define PKG_HEADER_EXT_SIZE 64
 
-static const uint8_t pkg_vita_2[] = {
-    0xe3, 0x1a, 0x70, 0xc9, 0xce, 0x1d, 0xd7, 0x2b, 0xf3, 0xc0, 0x62, 0x29, 0x63, 0xf2, 0xec, 0xcb,
-};
+// http://vitadevwiki.com/vita/Packages_(.PKG)#Keys
+static const uint8_t pkg_psp_key[] = { 0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d, 0x2c, 0x33, 0x81, 0x8d, 0x70, 0x9b, 0x60, 0xe6, 0x2b };
+static const uint8_t pkg_vita_2[] = { 0xe3, 0x1a, 0x70, 0xc9, 0xce, 0x1d, 0xd7, 0x2b, 0xf3, 0xc0, 0x62, 0x29, 0x63, 0xf2, 0xec, 0xcb };
+static const uint8_t pkg_vita_3[] = { 0x42, 0x3a, 0xca, 0x3a, 0x2b, 0xd5, 0x64, 0x9f, 0x96, 0x86, 0xab, 0xad, 0x6f, 0xd8, 0x80, 0x1f };
+static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 0xba, 0xf1, 0x33, 0x89, 0x66, 0x8b, 0x17, 0xd9, 0xea };
 
-static const uint8_t pkg_vita_3[] = {
-    0x42, 0x3a, 0xca, 0x3a, 0x2b, 0xd5, 0x64, 0x9f, 0x96, 0x86, 0xab, 0xad, 0x6f, 0xd8, 0x80, 0x1f,
-};
+static const uint8_t rif_header[] = { 0, 1, 0, 1, 0, 1, 0, 2, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01 };
 
-static const uint8_t pkg_vita_4[] = {
-    0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 0xba, 0xf1, 0x33, 0x89, 0x66, 0x8b, 0x17, 0xd9, 0xea,
-};
-
-static const uint8_t rif_header[] = {
-    0, 1, 0, 1, 0, 1, 0, 2, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01,
-};
-
-static void get_title(const uint8_t* data, size_t data_size, char* title)
+static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* title, char* content)
 {
-    if (data_size < 16)
+    uint8_t sfo[16 * 1024];
+    if (sfo_size < 16)
     {
-        fatal("ERROR: wrong param.sfo size\n");
+        fatal("ERROR: sfo information is too small\n");
     }
-
-    uint32_t magic = get32le(data);
-    if (magic != 0x46535000)
+    if (sfo_size > sizeof(sfo))
     {
-        fatal("ERROR: incorrect param.sfo signature\n");
+        fatal("ERROR: sfo information is too big, pkg file is probably corrupted\n");
+    }
+    sys_read(f, sfo_offset, sfo, sfo_size);
+
+    if (get32le(sfo) != 0x46535000)
+    {
+        fatal("ERROR: incorrect sfo signature\n");
     }
 
     // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
-    uint32_t keys = get32le(data + 8);
-    uint32_t values = get32le(data + 12);
-    size_t count = get32le(data + 16);
+    uint32_t keys = get32le(sfo + 8);
+    uint32_t values = get32le(sfo + 12);
+    uint32_t count = get32le(sfo + 16);
 
-    int index = -1;
-
-    for (size_t i=0; i<count; i++)
+    int title_index = -1;
+    int content_index = -1;
+    for (uint32_t i=0; i<count; i++)
     {
-        if (i*16 + 20 + 2 > data_size)
+        if (i*16 + 20 + 2 > sfo_size)
         {
-            fatal("ERROR: truncated param.sfo size\n");
+            fatal("ERROR: sfo information is too small\n");
         }
 
-        char* key = (char*)data + keys + get16le(data + i*16 + 20);
+        char* key = (char*)sfo + keys + get16le(sfo + i*16 + 20);
         if (strcmp(key, "TITLE") == 0)
         {
-            if (index < 0)
+            if (title_index < 0)
             {
-                index = (int)i;
+                title_index = (int)i;
             }
         }
         else if (strcmp(key, "STITLE") == 0)
         {
-            index = (int)i;
-            break;
+            title_index = (int)i;
+        }
+        else if (strcmp(key, "CONTENT_ID") == 0)
+        {
+            content_index = (int)i;
         }
     }
 
-    if (index >= 0)
+    if (title_index < 0 || content_index < 0)
     {
-        const char* value = (char*)data + values + get32le(data + index*16 + 20 + 12);
-        size_t i;
-        size_t max = 255;
-        for (i=0; i<max && *value; i++, value++)
+        fatal("ERROR: sfo information doesn't have game title or content id, pkg is probably corrupted\n");
+    }
+
+    const char* value = (char*)sfo + values + get32le(sfo + title_index*16 + 20 + 12);
+    size_t i;
+    size_t max = 255;
+    for (i=0; i<max && *value; i++, value++)
+    {
+        if (*value >= 32 && *value < 127 && strchr("<>\"/\\|?*", *value) == NULL)
         {
-            if (*value >= 32 && *value < 127 && strchr("<>\"/\\|?*", *value) == NULL)
-            {
-                if (*value == ':')
-                {
-                    *title++ = ' ';
-                    *title++ = '-';
-                    max--;
-                }
-                else
-                {
-                    *title++ = *value;
-                }
-            }
-            else if (*value == 10)
+            if (*value == ':')
             {
                 *title++ = ' ';
+                *title++ = '-';
+                max--;
+            }
+            else
+            {
+                *title++ = *value;
             }
         }
-        *title = 0;
+        else if (*value == 10)
+        {
+            *title++ = ' ';
+        }
     }
+    *title = 0;
+
+    value = (char*)sfo + values + get32le(sfo + content_index * 16 + 20 + 12);
+    while (*value)
+    {
+        *content++ = *value++;
+    }
+    *content = 0;
 }
 
 static const char* get_region(const char* id)
@@ -139,33 +147,75 @@ int main(int argc, char* argv[])
     uint64_t pkg_size;
     sys_file pkg = sys_open(argv[1], &pkg_size);
 
-    uint8_t pkg_header[256];
+    uint8_t pkg_header[PKG_HEADER_SIZE + PKG_HEADER_EXT_SIZE];
     sys_read(pkg, 0, pkg_header, sizeof(pkg_header));
 
-    if (get32be(pkg_header) != 0x7f504b47)
+    if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
     {
-        fatal("ERROR: pkg file is corrupted\n");
+        fatal("ERROR: not a pkg file\n");
     }
 
+    // http://www.psdevwiki.com/ps3/PKG_files
+    uint64_t meta_offset = get32be(pkg_header + 8);
+    uint32_t meta_count = get32be(pkg_header + 12);
+    uint32_t header_size = get32be(pkg_header + 16);
     uint32_t item_count = get32be(pkg_header + 20);
+    uint64_t total_size = get64be(pkg_header + 24);
     uint64_t enc_offset = get64be(pkg_header + 32);
+    const uint8_t* iv = pkg_header + 0x70;
+    int key_type = pkg_header[0xe7] & 7;
 
+    if (pkg_size < total_size)
+    {
+        fatal("ERROR: pkg file is too small\n");
+    }
     if (item_count > ZIP_MAX_FILES)
     {
         fatal("ERROR: pkg has too many files");
     }
-
     if (pkg_size < enc_offset + item_count * 32)
     {
-        fatal("ERROR: pkg file is truncated\n");
+        fatal("ERROR: pkg file is too small\n");
     }
 
-    const char* id = (char*)pkg_header + 0x37;
-    const uint8_t* iv = pkg_header + 0x70;
-    int key_type = pkg_header[0xe7] & 7;
+    uint32_t drm_type = 0;
+    uint32_t content_type = 0;
+    uint32_t sfo_offset = 0;
+    uint32_t sfo_size = 0;
+    uint32_t items_offset = 0;
+    uint32_t items_size = 0;
+
+    for (uint32_t i = 0; i < meta_count; i++)
+    {
+        uint8_t block[16];
+        sys_read(pkg, meta_offset, block, sizeof(block));
+
+        uint32_t type = get32be(block + 0);
+        uint32_t size = get32be(block + 4);
+
+        if (type == 1)
+        {
+            drm_type = get32be(block + 8);
+        }
+        else if (type == 2)
+        {
+            content_type = get32be(block + 8);
+        }
+        else if (type == 13)
+        {
+            items_offset = get32be(block + 8);
+            items_size = get32be(block + 12);
+        }
+        else if (type == 14)
+        {
+            sfo_offset = get32be(block + 8);
+            sfo_size = get32be(block + 12);
+        }
+
+        meta_offset += 2 * sizeof(uint32_t) + size;
+    }
 
     uint8_t main_key[16];
-
     if (key_type == 1)
     {
         memcpy(main_key, pkg_psp_key, sizeof(main_key));
@@ -189,14 +239,10 @@ int main(int argc, char* argv[])
         aes128_ecb_encrypt(&key, iv, main_key);
     }
 
-    uint8_t items[32 * ZIP_MAX_FILES];
-    uint32_t items_size = 32 * item_count;
-
-    sys_read(pkg, enc_offset, items, items_size);
-
-    uint8_t temp_flag = 0;
-    size_t head_size = enc_offset;
-    char title[256] = "unknown title";
+    char content[256];
+    char title[256];
+    parse_sfo(pkg, sfo_offset, sfo_size, title, content);
+    char* id = content + 7;
 
     char path[1024];
     snprintf(path, sizeof(path), ".~%.*s.zip", 9, id);
@@ -215,22 +261,21 @@ int main(int argc, char* argv[])
     printf("[*] decrypting...\n");
     aes128_key key;
     aes128_init(&key, main_key);
-    aes128_ctr_xor(&key, iv, 0, items, items_size);
+
+    uint8_t work_sku_flag = (drm_type == 3 || drm_type == 13) ? 3 : 0;
 
     for (uint32_t item_index=0; item_index<item_count; item_index++)
     {
-        uint8_t* item = items + item_index * 32;
+        uint8_t item[32];
+        uint64_t offset = items_offset + item_index * 32;
+        sys_read(pkg, enc_offset + offset, item, sizeof(item));
+        aes128_ctr_xor(&key, iv, offset/16, item, sizeof(item));
 
         uint32_t name_offset = get32be(item + 0);
         uint32_t name_size = get32be(item + 4);
         uint64_t data_offset = get64be(item + 8);
         uint64_t data_size = get64be(item + 16);
         uint8_t flags = item[27];
-
-        if (item_index == 0)
-        {
-            head_size += data_offset;
-        }
 
         assert(name_offset % 16 == 0);
         assert(data_offset % 16 == 0);
@@ -279,12 +324,8 @@ int main(int argc, char* argv[])
                             uint32_t sku_flag = get32be(buffer + 252);
                             if (sku_flag == 1 || sku_flag == 3)
                             {
-                                temp_flag = 3;
+                                work_sku_flag = 3;
                             }
-                        }
-                        else if (memcmp("sce_sys/param.sfo", name, name_size) == 0)
-                        {
-                            get_title(buffer, size, title);
                         }
                     }
                     zip_write_file(&z, buffer, size);
@@ -301,6 +342,7 @@ int main(int argc, char* argv[])
     snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/head.bin", id);
 
     zip_begin_file(&z, path);
+    uint64_t head_size = enc_offset + items_size;
     uint64_t head_offset = 0;
     while (head_size != 0)
     {
@@ -318,7 +360,7 @@ int main(int argc, char* argv[])
 
     uint8_t tail[480];
     zip_begin_file(&z, path);
-    sys_read(pkg, pkg_size - sizeof(tail), tail, sizeof(tail));
+    sys_read(pkg, total_size - sizeof(tail), tail, sizeof(tail));
     zip_write_file(&z, tail, sizeof(tail));
     zip_end_file(&z);
 
@@ -334,7 +376,7 @@ int main(int argc, char* argv[])
         printf("[*] embedding '%s' key\n", argv[2]);
         get_hex_bytes16(argv[2], work + 0x50);
     }
-    work[255] = temp_flag;
+    work[255] = work_sku_flag;
     zip_begin_file(&z, path);
     zip_write_file(&z, work, sizeof(work));
     zip_end_file(&z);
