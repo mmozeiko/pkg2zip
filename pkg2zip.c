@@ -459,6 +459,10 @@ int main(int argc, char* argv[])
     else
     {
         printf("[*] creating dummy rif file\n");
+
+        memcpy(rif, rif_header, sizeof(rif_header));
+        memcpy(rif + 0x10, id, 0x30);
+        rif[255] = work_sku_flag;
     }
 
     zip_begin_file(&z, path);
