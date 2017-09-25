@@ -453,6 +453,10 @@ int main(int argc, char* argv[])
             }
         }
     }
+    else
+    {
+        printf("[*] creating dummy rif file\n");
+    }
 
     zip_begin_file(&z, path);
     zip_write_file(&z, rif, sizeof(rif));
