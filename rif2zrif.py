@@ -44,4 +44,6 @@ bin += c.flush()
 if len(bin) % 3 != 0:
   bin += b"\0" * (3 - len(bin) % 3)
 
-print(base64.b64encode(bin).decode("ascii"))
+content = rif[0x10:0x40].rstrip(b"\0").decode("ascii")
+
+print(content, base64.b64encode(bin).decode("ascii"))
