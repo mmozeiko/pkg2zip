@@ -248,6 +248,17 @@ int main(int argc, char* argv[])
     const char* id = content + 7;
     const char* id2 = id + 13;
 
+    // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
+    uint8_t rif[512] = { 0 };
+    if (argc == 3 && strlen(argv[2]) != 32)
+    {
+        zrif_decode(argv[2], rif);
+        if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
+        {
+            fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif + 0x10, content);
+        }
+    }
+
     char path[1024];
     if (dlc)
     {
@@ -429,8 +440,6 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/work.bin", id);
     }
 
-    // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
-    uint8_t rif[512] = { 0 };
     if (argc == 3)
     {
         if (strlen(argv[2]) == 32)
@@ -445,12 +454,6 @@ int main(int argc, char* argv[])
         else
         {
             printf("[*] saving zRIF to rif file\n");
-            zrif_decode(argv[2], rif);
-
-            if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
-            {
-                fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif + 0x10, content);
-            }
         }
     }
     else
