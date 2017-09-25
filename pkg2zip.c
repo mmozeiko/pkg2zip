@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
     printf("pkg2zip v1.2\n");
     if (argc < 2 || argc > 3)
     {
-        fatal("Usage: %s file.pkg [NoNpDrmKey]\n", argv[0]);
+        fatal("Usage: %s file.pkg [NoNpDrmKey | zRIF]\n", argv[0]);
     }
 
     printf("[*] loading...\n");
