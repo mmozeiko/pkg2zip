@@ -2,7 +2,7 @@
 
 Utility that decrypts PlayStation Vita pkg file and creates zip package.
 
-Optionally embedds [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license into work.bin file. You must provide license key.
+Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license into work.bin file. You must provide license key.
 
 # Features
 
@@ -18,7 +18,17 @@ Limitations:
 
 Execute `pkg2zip package.pkg` to create `title [id] [region].zip` file. Title, ID and region is automatically detected from pkg file.
 
-If you have license key (32 hex characters) you can execute `pkg2zip package.pkg hexkey` to embed key into work.bin file.
+If you have raw license key (32 hex characters) you can execute `pkg2zip package.pkg hexkey` to try to generate work.bin file (works for most pkg files).
+
+If you have working zRIF string, then execute `pkg2zip package.pkg zRIF_string` to create work.bin file from zRIF encoding.
+
+# Generating zRIF license
+
+I you have working main.bin file you can create zRIF string with `rif2zrif.py` python script:
+
+    $ python rif2zrif.py path/to/main.bin
+
+It will print zRIF string to stdout.
 
 # Download
 
@@ -41,6 +51,7 @@ On Windows you can build either with MinGW (get [MinGW-w64](http://www.msys2.org
 * https://github.com/RikuKH3/unpkg_vita
 * https://github.com/St4rk/PkgDecrypt
 * https://github.com/TheRadziu/PkgDecrypt
+* https://github.com/weaknespase/PkgDecrypt
 
 # License
 
