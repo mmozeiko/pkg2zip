@@ -1,6 +1,7 @@
 #include "pkg2zip_aes.h"
 #include "pkg2zip_zip.h"
 #include "pkg2zip_utils.h"
+#include "pkg2zip_zrif.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -159,7 +160,6 @@ int main(int argc, char* argv[])
     // http://www.psdevwiki.com/ps3/PKG_files
     uint64_t meta_offset = get32be(pkg_header + 8);
     uint32_t meta_count = get32be(pkg_header + 12);
-    uint32_t header_size = get32be(pkg_header + 16);
     uint32_t item_count = get32be(pkg_header + 20);
     uint64_t total_size = get64be(pkg_header + 24);
     uint64_t enc_offset = get64be(pkg_header + 32);
@@ -422,27 +422,40 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "license/addcont/%.9s/%s/", id, id2);
         zip_add_folder(&z, path);
 
-        printf("[*] creating DLC rif file\n");
         snprintf(path, sizeof(path), "license/addcont/%.9s/%s/6488b73b912a753a492e2714e9b38bc7.rif", id, id2);
     }
     else
     {
-        printf("[*] creating work.bin\n");
         snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/work.bin", id);
     }
 
     // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
-    uint8_t work[512] = { 0 };
-    memcpy(work, rif_header, sizeof(rif_header));
-    memcpy(work + 0x10, pkg_header + 0x30, 0x30);
+    uint8_t rif[512] = { 0 };
     if (argc == 3)
     {
-        printf("[*] embedding '%s' key\n", argv[2]);
-        get_hex_bytes16(argv[2], work + 0x50);
+        if (strlen(argv[2]) == 32)
+        {
+            printf("[*] generating rif file with '%s' key\n", argv[2]);
+
+            memcpy(rif, rif_header, sizeof(rif_header));
+            memcpy(rif + 0x10, id, 0x30);
+            get_hex_bytes16(argv[2], rif + 0x50);
+            rif[255] = work_sku_flag;
+        }
+        else
+        {
+            printf("[*] saving zRIF to rif file\n");
+            zrif_decode(argv[2], rif);
+
+            if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
+            {
+                fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif + 0x10, content);
+            }
+        }
     }
-    work[255] = work_sku_flag;
+
     zip_begin_file(&z, path);
-    zip_write_file(&z, work, sizeof(work));
+    zip_write_file(&z, rif, sizeof(rif));
     zip_end_file(&z);
 
     zip_close(&z);

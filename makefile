@@ -6,7 +6,7 @@ else
 endif
 
 BIN=pkg2zip${EXE}
-SRC=${wildcard pkg2zip*.c}
+SRC=${wildcard pkg2zip*.c} puff.c
 OBJ=${SRC:.c=.o}
 DEP=${SRC:.c=.d}
 

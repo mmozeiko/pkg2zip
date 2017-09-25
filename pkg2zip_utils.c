@@ -36,12 +36,8 @@ static int hex2byte(char ch)
 
 void get_hex_bytes16(const char* str, uint8_t* bytes)
 {
-    for (size_t i = 0; i<16; i++)
+    for (size_t i = 0; i < 16; i++)
     {
-        if (str[0] == 0 || str[1] == 0)
-        {
-            fatal("ERROR: hex string must be 32 hex characters long\n");
-        }
         bytes[i] = (uint8_t)((hex2byte(str[0]) << 4) + hex2byte(str[1]));
         str += 2;
     }
