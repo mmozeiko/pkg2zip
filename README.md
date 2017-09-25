@@ -22,13 +22,19 @@ If you have raw license key (32 hex characters) you can execute `pkg2zip package
 
 If you have working zRIF string, then execute `pkg2zip package.pkg zRIF_string` to create work.bin file from zRIF encoding.
 
-# Generating zRIF license
+# Generating zRIF string
 
-I you have working main.bin file you can create zRIF string with `rif2zrif.py` python script:
+If you have working main.bin file you can create zRIF string with `rif2zrif.py` python script:
 
     $ python rif2zrif.py path/to/main.bin
 
 It will print zRIF string to stdout.
+
+To generate main.bin from zRIF string use `zrif2rif.py` script:
+
+    $ python zrif2rif.py zRIF work.bin
+
+Last argument is optional, it specifies where to save file and defaults to work.bin name.
 
 # Download
 
