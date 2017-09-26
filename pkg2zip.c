@@ -299,9 +299,9 @@ int main(int argc, char* argv[])
     for (uint32_t item_index=0; item_index<item_count; item_index++)
     {
         uint8_t item[32];
-        uint64_t offset = items_offset + item_index * 32;
-        sys_read(pkg, enc_offset + offset, item, sizeof(item));
-        aes128_ctr_xor(&key, iv, offset/16, item, sizeof(item));
+        uint64_t item_offset = items_offset + item_index * 32;
+        sys_read(pkg, enc_offset + item_offset, item, sizeof(item));
+        aes128_ctr_xor(&key, iv, item_offset/16, item, sizeof(item));
 
         uint32_t name_offset = get32be(item + 0);
         uint32_t name_size = get32be(item + 4);
