@@ -1,6 +1,6 @@
 #include "pkg2zip_zrif.h"
 #include "pkg2zip_utils.h"
-#include "puff.h"
+#include "pkg2zip_puff.h"
 
 #include <assert.h>
 #include <string.h>
