@@ -9,4 +9,4 @@ set CL=%CL% /Ox
 rem set CL=%CL% /Od /Zi
 rem set LINK=%LINK% /DEBUG
 
-cl.exe pkg2zip*.c /Fepkg2zip.exe
+cl.exe pkg2zip*.c puff.c /Fepkg2zip.exe
