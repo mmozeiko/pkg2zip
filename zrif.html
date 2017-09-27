@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.6/pako.min.js"></script>
+    <style>
+fieldset { margin: 20px; border: 1px solid; }
+p { margin: 20px; }
+</style>
+
+  </head>
+  <body>
+<fieldset>
+    <legend>Create zRIF string from work.bin</legend>
+  <p>
+  1. Select RIF file (work.bin): <input type="file" id="file" />
+  </p>
+  <p>
+  2. Press the button: <input type="button" id="convert" value="convert" />
+  </p>
+  <p>
+  3. Copy the zRIF string: <input type="text" id="zrif" size="100" />
+  </p>
+</fieldset>
+
+<fieldset>
+    <legend>Create work.bin from zRIF string</legend>
+  <p>
+  1. Provide zRIF string: <input type="text" id="zrif2" size="100" />
+  </p>
+  <p>
+  2. Convert to work.bin: <input type="button" id="convert2" value="convert" />
+  </p>
+</fieldset>
+
+<script>
+
+function base64ArrayBuffer(bytes) {
+  var base64    = ''
+  var encodings = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+  var byteLength    = bytes.byteLength
+  var byteRemainder = byteLength % 3
+  var mainLength    = byteLength - byteRemainder
+
+  var a, b, c, d
+  var chunk
+
+  // Main loop deals with bytes in chunks of 3
+  for (var i = 0; i < mainLength; i = i + 3) {
+    // Combine the three bytes into a single integer
+    chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2]
+
+    // Use bitmasks to extract 6-bit segments from the triplet
+    a = (chunk & 16515072) >> 18 // 16515072 = (2^6 - 1) << 18
+    b = (chunk & 258048)   >> 12 // 258048   = (2^6 - 1) << 12
+    c = (chunk & 4032)     >>  6 // 4032     = (2^6 - 1) << 6
+    d = chunk & 63               // 63       = 2^6 - 1
+
+    // Convert the raw binary segments to the appropriate ASCII encoding
+    base64 += encodings[a] + encodings[b] + encodings[c] + encodings[d]
+  }
+
+  // Deal with the remaining bytes and padding
+  if (byteRemainder == 1) {
+    chunk = bytes[mainLength]
+
+    a = (chunk & 252) >> 2 // 252 = (2^6 - 1) << 2
+
+    // Set the 4 least significant bits to zero
+    b = (chunk & 3)   << 4 // 3   = 2^2 - 1
+
+    base64 += encodings[a] + encodings[b] + '=='
+  } else if (byteRemainder == 2) {
+    chunk = (bytes[mainLength] << 8) | bytes[mainLength + 1]
+
+    a = (chunk & 64512) >> 10 // 64512 = (2^6 - 1) << 10
+    b = (chunk & 1008)  >>  4 // 1008  = (2^6 - 1) << 4
+
+    // Set the 2 least significant bits to zero
+    c = (chunk & 15)    <<  2 // 15    = 2^4 - 1
+
+    base64 += encodings[a] + encodings[b] + encodings[c] + '='
+  }
+  
+  return base64
+}
+
+function concatTypedArrays(a, b) { // a, b TypedArray of same type
+    var c = new (a.constructor)(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+}
+
+var ddd = pako.inflate(atob("eNpjYBgFo2AU0AsYAIElGt8MRJiDCAsw3xhEmIAIU4N4AwNdRxcXZ3+/EJCAkW6Ac7C7ARwYgviuQAaIdoPSzlDaBUo7QmknIM3ACIZM78+u7kx3VWYEAGJ9HV0="));
+
+function encode(arr) {
+  arr = pako.deflate(arr, {
+  	level: 9,
+    windowBits: 10,
+    memLevel: 8,
+	  dictionary: ddd
+  });
+  var dec = pako.inflate(arr, { dictionary: ddd });
+  console.log(dec);
+  while (arr.length % 3 != 0) {
+    arr = concatTypedArrays(arr, new Uint8Array([0]));
+  }
+  return base64ArrayBuffer(arr);
+}
+
+function convert() {
+
+    var files = document.getElementById('file').files;
+    if (!files.length) {
+      alert('Please select a file!');
+      return;
+    }
+    var file = files[0];
+    var start = 0;
+
+    var reader = new FileReader();
+    reader.onloadend = function(evt) {
+      if (evt.target.readyState == FileReader.DONE) {
+          document.getElementById('zrif').value = encode(evt.target.result);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function decode(str) {
+  var tmp = window.atob(str);
+  var arr = new Uint8Array(tmp.length);
+  for (var i=0; i<tmp.length; i++) {
+    arr[i] = tmp.charCodeAt(i);
+  }
+  arr = pako.inflate(arr, {
+    windowBits: 10,
+	  dictionary: ddd
+  });
+  return arr;
+}
+
+var saveByteArray = (function () {
+    var a = document.createElement("a");
+    document.body.appendChild(a);
+    a.style = "display: none";
+    return function (data, name) {
+        var blob = new Blob([data], {type: "octet/stream"}),
+            url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = name;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    };
+}());
+
+function convert2() {
+   var rif = document.getElementById("zrif2").value;
+   var bin;
+   try {
+     bin = decode(rif);
+   } catch (e) {
+     alert("Error converting: " + e);
+     return;
+   }
+   if (bin.length != 512) {
+     alert("wrong size of work.bin");
+     return;
+   }
+   saveByteArray(bin, "work.bin");
+}
+  
+document.getElementById("convert").onclick = convert;
+document.getElementById("convert2").onclick = convert2;
+</script>    
+
+</body>
+</html>
