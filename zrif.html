@@ -5,7 +5,7 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.6/pako.min.js"></script>
     <style>
 fieldset { margin: 20px; border: 1px solid; }
-p { margin: 20px; }
+p { margin: 10px; }
 </style>
 
   </head>
@@ -20,6 +20,10 @@ p { margin: 20px; }
   </p>
   <p>
   3. Copy the zRIF string: <input type="text" id="zrif" size="100" />
+  <div id="info1" style="display:none">
+    <p>Content ID: <span id="id1"></span></p>
+    <p>Raw key: <span id="raw1"></span></p>
+  </div>
   </p>
 </fieldset>
 
@@ -31,6 +35,10 @@ p { margin: 20px; }
   <p>
   2. Convert to work.bin: <input type="button" id="convert2" value="convert" />
   </p>
+  <div id="info2" style="display:none">
+    <p>Content ID: <span id="id2"></span></p>
+    <p>Raw key: <span id="raw2"></span></p>
+  </div>
 </fieldset>
 
 <script>
@@ -103,11 +111,31 @@ function encode(arr) {
 	  dictionary: ddd
   });
   var dec = pako.inflate(arr, { dictionary: ddd });
-  console.log(dec);
   while (arr.length % 3 != 0) {
     arr = concatTypedArrays(arr, new Uint8Array([0]));
   }
   return base64ArrayBuffer(arr);
+}
+
+function updateInfo(bin, id) {
+  var content = "";
+  for (var i=0x10; i<0x40; i++) {
+     if (bin[i] == 0) break;
+     content += String.fromCharCode(bin[i]);
+  }
+
+  var key = "";
+  for (var i=0x50; i<0x60; i++) {
+     var hex = Number(bin[i]).toString(16);
+     if (hex.length == 1) {
+       hex = "0" + hex;
+     }
+     key += hex;
+  }
+
+  document.getElementById("id" + id).innerText = content;
+  document.getElementById("raw" + id).innerText = key;
+  document.getElementById("info" + id).style.display = "block";
 }
 
 function convert() {
@@ -123,7 +151,9 @@ function convert() {
     var reader = new FileReader();
     reader.onloadend = function(evt) {
       if (evt.target.readyState == FileReader.DONE) {
-          document.getElementById('zrif').value = encode(evt.target.result);
+          var bin = new Uint8Array(evt.target.result);
+          updateInfo(bin, "1");
+          document.getElementById('zrif').value = encode(bin);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -169,6 +199,7 @@ function convert2() {
      alert("wrong size of work.bin");
      return;
    }
+   updateInfo(bin, "2");
    saveByteArray(bin, "work.bin");
 }
   
