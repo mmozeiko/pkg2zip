@@ -35,6 +35,9 @@ p { margin: 10px; }
   <p>
   2. Convert to work.bin: <input type="button" id="convert2" value="convert" />
   </p>
+  <p>
+  3. Click to download: <a href="" id="download"></a>
+  </p>
   <div id="info2" style="display:none">
     <p>Content ID: <span id="id2"></span></p>
     <p>Raw key: <span id="raw2"></span></p>
@@ -172,20 +175,6 @@ function decode(str) {
   return arr;
 }
 
-var saveByteArray = (function () {
-    var a = document.createElement("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    return function (data, name) {
-        var blob = new Blob([data], {type: "octet/stream"}),
-            url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = name;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    };
-}());
-
 function convert2() {
    var rif = document.getElementById("zrif2").value;
    var bin;
@@ -200,7 +189,12 @@ function convert2() {
      return;
    }
    updateInfo(bin, "2");
-   saveByteArray(bin, "work.bin");
+
+   var a = document.getElementById("download");
+   var blob = new Blob([bin], {type: "octet/stream"});
+   var url = window.URL.createObjectURL(blob);
+   a.href = url;
+   a.download = a.innerText = "work.bin";
 }
   
 document.getElementById("convert").onclick = convert;
