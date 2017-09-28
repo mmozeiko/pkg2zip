@@ -1,6 +1,7 @@
 @echo off
 
 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat" -arch=amd64 -host_arch=amd64
+cd "%~dp0"
 
 set CL=/nologo /errorReport:none /Gm- /GF /GS- /MT /W4 /wd4324
 set LINK=/errorReport:none /INCREMENTAL:NO
