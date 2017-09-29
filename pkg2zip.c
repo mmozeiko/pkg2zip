@@ -368,10 +368,6 @@ int main(int argc, char* argv[])
         else if (flags <= 3 || (flags >= 14 && flags <= 17) ||
                  flags == 19 || flags == 21 || flags == 22)
         {
-            if (memcmp("sce_pfs/pflist", name, name_size) == 0)
-            {
-                continue;
-            }
             if (dlc)
             {
                 if (strncmp("sce_sys/package/", name, 16) == 0)
