@@ -22,7 +22,7 @@ static const uint8_t rif_header[] = { 0, 1, 0, 1, 0, 1, 0, 2, 0xef, 0xcd, 0xab, 
 
 // http://vitadevwiki.com/vita/System_File_Object_(SFO)_(PSF)#Internal_Structure
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
-static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* title, char* content)
+static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* title, char* content, char* min_version)
 {
     uint8_t sfo[16 * 1024];
     if (sfo_size < 16)
@@ -46,6 +46,7 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
 
     int title_index = -1;
     int content_index = -1;
+    int minver_index = -1;
     for (uint32_t i=0; i<count; i++)
     {
         if (i*16 + 20 + 2 > sfo_size)
@@ -68,6 +69,10 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
         else if (strcmp(key, "CONTENT_ID") == 0)
         {
             content_index = (int)i;
+        }
+        else if (strcmp(key, "PSP2_DISP_VER") == 0)
+        {
+            minver_index = (int)i;
         }
     }
 
@@ -107,6 +112,24 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
         *content++ = *value++;
     }
     *content = 0;
+
+    value = (char*)sfo + values + get32le(sfo + minver_index * 16 + 20 + 12);
+    if (*value == '0')
+    {
+        value++;
+    }
+    while (*value)
+    {
+        *min_version++ = *value++;
+    }
+    if (min_version[-1] == '0')
+    {
+        min_version[-1] = 0;
+    }
+    else
+    {
+        *min_version = 0;
+    }
 }
 
 static const char* get_region(const char* id)
@@ -244,7 +267,8 @@ int main(int argc, char* argv[])
 
     char content[256];
     char title[256];
-    parse_sfo(pkg, sfo_offset, sfo_size, title, content);
+    char min_version[256];
+    parse_sfo(pkg, sfo_offset, sfo_size, title, content, min_version);
     const char* id = content + 7;
     const char* id2 = id + 13;
 
@@ -471,5 +495,6 @@ int main(int argc, char* argv[])
 
     zip_close(&z);
 
+    printf("[*] minimum fw version required: %s\n", min_version);
     printf("[*] done!\n");
 }
