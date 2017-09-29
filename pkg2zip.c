@@ -81,7 +81,7 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
     size_t max = 255;
     for (i=0; i<max && *value; i++, value++)
     {
-        if (*value >= 32 && *value < 127 && strchr("<>\"/\\|?*", *value) == NULL)
+        if ((*value >= 32 && *value < 127 && strchr("<>\"/\\|?*", *value) == NULL) || (uint8_t)*value >= 128)
         {
             if (*value == ':')
             {
