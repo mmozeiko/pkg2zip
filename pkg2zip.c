@@ -467,7 +467,7 @@ int main(int argc, char* argv[])
             printf("[*] generating rif file with '%s' key\n", argv[2]);
 
             memcpy(rif, rif_header, sizeof(rif_header));
-            memcpy(rif + 0x10, id, 0x30);
+            memcpy(rif + 0x10, content, 0x30);
             get_hex_bytes16(argv[2], rif + 0x50);
             rif[255] = work_sku_flag;
         }
