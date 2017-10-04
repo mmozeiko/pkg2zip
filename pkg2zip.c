@@ -161,7 +161,7 @@ static const char* get_region(const char* id)
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.2\n");
+    printf("pkg2zip v1.3\n");
     if (argc < 2 || argc > 3)
     {
         fatal("Usage: %s file.pkg [NoNpDrmKey | zRIF]\n", argv[0]);
