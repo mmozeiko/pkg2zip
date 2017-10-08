@@ -1,4 +1,9 @@
-#define _CRT_SECURE_NO_DEPRECATE
+#if defined(__MINGW32__) && !defined(__x86_64__)
+#  define _USE_32BIT_TIME_T
+#  define __CRT__NO_INLINE
+#elif defined(_MSC_VER)
+#  define _CRT_SECURE_NO_DEPRECATE
+#endif
 
 #include "pkg2zip_zip.h"
 #include "pkg2zip_utils.h"
