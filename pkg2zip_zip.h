@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define ZIP_MAX_FILES (16*1024)
+#define ZIP_MAX_FILES (32*1024)
 #define ZIP_MAX_FILENAME 1024
 
 typedef struct {
