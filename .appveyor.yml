@@ -1,0 +1,23 @@
+version: '#{build}'
+skip_tags: true
+clone_depth: 1
+
+build: off
+deploy: off
+
+environment:
+  matrix:
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PATH: C:\mingw-w64\x86_64-6.3.0-posix-seh-rt_v5-rev1\mingw64\bin;%PATH%
+      CC: gcc
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      PATH: C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32\bin;%PATH%
+      CC: gcc
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+
+test_script:
+  - if "%CC%" == "" call build.cmd
+  - if "%CC%" == "gcc" mingw32-make
