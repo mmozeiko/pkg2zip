@@ -191,10 +191,6 @@ int main(int argc, char* argv[])
     {
         fatal("ERROR: pkg file is too small\n");
     }
-    if (item_count > ZIP_MAX_FILES)
-    {
-        fatal("ERROR: pkg has too many files");
-    }
     if (pkg_size < enc_offset + item_count * 32)
     {
         fatal("ERROR: pkg file is too small\n");

@@ -1,6 +1,8 @@
 #include "pkg2zip_sys.h"
 #include "pkg2zip_utils.h"
 
+#include <stdlib.h>
+
 #if defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
@@ -139,3 +141,32 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 }
 
 #endif
+
+void* sys_realloc(void* ptr, size_t size)
+{
+    void* result = NULL;
+    if (!ptr && size)
+    {
+        result = malloc(size);
+    }
+    else if (ptr && !size)
+    {
+        free(ptr);
+        return NULL;
+    }
+    else if (ptr && size)
+    {
+        result = realloc(ptr, size);
+    }
+    else
+    {
+        fatal("error using sys_realloc function");
+    }
+
+    if (!result)
+    {
+        fatal("out of memory");
+    }
+
+    return result;
+}

@@ -5,18 +5,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define ZIP_MAX_FILES (32*1024)
 #define ZIP_MAX_FILENAME 1024
+
+typedef struct zip_file zip_file;
 
 typedef struct {
     sys_file file;
     uint64_t total;
     uint32_t count;
+    uint32_t max;
     uint16_t time;
     uint16_t date;
-    uint64_t offset[ZIP_MAX_FILES];
-    uint64_t size[ZIP_MAX_FILES];
-    uint32_t crc32[ZIP_MAX_FILES];
+    uint32_t allocated; // bytes
+    zip_file* files;
+    zip_file* current;
 } zip;
 
 void zip_create(zip* z, const char* name);

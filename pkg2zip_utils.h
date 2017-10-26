@@ -8,7 +8,7 @@
 #  define NORETURN __attribute__((noreturn))
 #endif
 
-void NORETURN fatal(const char* msg, ...) ;
+void NORETURN fatal(const char* msg, ...);
 
 static inline uint32_t min32(uint32_t a, uint32_t b)
 {

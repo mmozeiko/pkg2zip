@@ -11,6 +11,8 @@
 #include <string.h>
 #include <time.h>
 
+#define ZIP_MEMORY_BLOCK (1024 * 1024)
+
 #define ZIP_VERSION 45
 #define ZIP_METHOD_STORE 0
 #define ZIP_UTF8_FLAG (1 << 11)
@@ -63,11 +65,34 @@ static const uint32_t crc32[256] =
     0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
 };
 
+struct zip_file
+{
+    uint64_t offset;
+    uint64_t size;
+    uint32_t crc32;
+};
+
+static zip_file* zip_new_file(zip* z)
+{
+    if (z->count == z->max)
+    {
+        z->allocated += ZIP_MEMORY_BLOCK;
+        z->files = sys_realloc(z->files, z->allocated);
+        z->max = z->allocated / sizeof(zip_file);
+    }
+
+    return z->files + z->count++;
+}
+
 void zip_create(zip* z, const char* name)
 {
     z->file = sys_create(name);
     z->total = 0;
     z->count = 0;
+    z->max = 0;
+    z->allocated = 0;
+    z->files = NULL;
+    z->current = NULL;
 
     time_t t = time(NULL);
     struct tm* tm = localtime(&t);
@@ -77,21 +102,16 @@ void zip_create(zip* z, const char* name)
 
 void zip_add_folder(zip* z, const char* name)
 {
-    if (z->count == ZIP_MAX_FILES)
-    {
-        fatal("ERROR: too many files\n");
-    }
-
     size_t name_length = strlen(name);
     if (name_length > ZIP_MAX_FILENAME)
     {
         fatal("ERROR: dirname too long\n");
     }
 
-    z->offset[z->count] = z->total;
-    z->size[z->count] = 0;
-    z->crc32[z->count] = 0;
-    z->count++;
+    zip_file* f = zip_new_file(z);
+    f->offset = z->total;
+    f->size = 0;
+    f->crc32 = 0;
 
     uint8_t header[ZIP_LOCAL_HEADER_SIZE] = { 0x50, 0x4b, 0x03, 0x04 };
     // version needed to extract
@@ -116,20 +136,17 @@ void zip_add_folder(zip* z, const char* name)
 
 void zip_begin_file(zip* z, const char* name)
 {
-    if (z->count == ZIP_MAX_FILES)
-    {
-        fatal("ERROR: too many files\n");
-    }
-
     size_t name_length = strlen(name);
     if (name_length > ZIP_MAX_FILENAME)
     {
         fatal("ERROR: filename too long\n");
     }
 
-    z->offset[z->count] = z->total;
-    z->size[z->count] = 0;
-    z->crc32[z->count] = 0xffffffff;
+    zip_file* f = zip_new_file(z);
+    f->offset = z->total;
+    f->size = 0;
+    f->crc32 = 0xffffffff;
+    z->current = f;
 
     uint8_t header[ZIP_LOCAL_HEADER_SIZE] = { 0x50, 0x4b, 0x03, 0x04 };
     // version needed to extract
@@ -156,36 +173,36 @@ void zip_write_file(zip* z, const void* data, uint32_t size)
 {
     sys_write(z->file, z->total, data, size);
     z->total += size;
-    z->size[z->count] += size;
+    z->current->size += size;
 
     const uint8_t* bytes = data;
-    uint32_t tmp = z->crc32[z->count];
+    uint32_t tmp = z->current->crc32;
     for (uint32_t i = 0; i < size; i++)
     {
         tmp = (tmp >> 8) ^ crc32[(uint8_t)(tmp ^ bytes[i])];
     }
-    z->crc32[z->count] = tmp;
+    z->current->crc32 = tmp;
 }
 
 void zip_end_file(zip* z)
 {
-    z->crc32[z->count] ^= 0xffffffff;
+    z->current->crc32 ^= 0xffffffff;
 
-    uint64_t size = z->size[z->count];
+    uint64_t size = z->current->size;
     if (size > 0)
     {
         uint8_t update[3 * sizeof(uint32_t)];
         // crc-32
-        set32le(update + 0, z->crc32[z->count]);
+        set32le(update + 0, z->current->crc32);
         // compressed size
         set32le(update + 4, (uint32_t)min64(size, 0xffffffff));
         // uncompressed size
         set32le(update + 8, (uint32_t)min64(size, 0xffffffff));
 
-        sys_write(z->file, z->offset[z->count] + ZIP_LOCAL_HEADER_CRC32_OFFSET, update, sizeof(update));
+        sys_write(z->file, z->current->offset + ZIP_LOCAL_HEADER_CRC32_OFFSET, update, sizeof(update));
     }
 
-    z->count++;
+    z->current = NULL;
 }
 
 void zip_close(zip* z)
@@ -195,19 +212,21 @@ void zip_close(zip* z)
     // central directory headers
     for (uint32_t i = 0; i < z->count; i++)
     {
+        const zip_file* f = z->files + i;
+
         uint8_t local[ZIP_LOCAL_HEADER_SIZE];
-        sys_read(z->file, z->offset[i], local, sizeof(local));
+        sys_read(z->file, f->offset, local, sizeof(local));
 
         uint32_t filename_length = get16le(local + ZIP_LOCAL_HEADER_FILENAME_LENGTH_OFFSET);
 
         uint8_t global[ZIP_GLOBAL_HEADER_SIZE + ZIP_MAX_FILENAME] = { 0x50, 0x4b, 0x01, 0x02 };
-        sys_read(z->file, z->offset[i] + sizeof(local), global + ZIP_GLOBAL_HEADER_SIZE, filename_length);
+        sys_read(z->file, f->offset + sizeof(local), global + ZIP_GLOBAL_HEADER_SIZE, filename_length);
         int is_folder = global[ZIP_GLOBAL_HEADER_SIZE + filename_length - 1] == '/';
 
         uint8_t extra[28];
         uint16_t extra_size = 0;
-        uint64_t size = z->size[i];
-        uint64_t offset = z->offset[i];
+        uint64_t size = f->size;
+        uint64_t offset = f->offset;
         uint32_t attributes = ZIP_DOS_ATTRIBUTE_ARCHIVE;
         if (is_folder)
         {
@@ -247,7 +266,7 @@ void zip_close(zip* z)
         // last mod file date
         set16le(global + 14, z->date);
         // crc-32
-        set32le(global + 16, z->crc32[i]);
+        set32le(global + 16, f->crc32);
         // compressed size
         set32le(global + 20, (uint32_t)min64(size, 0xffffffff));
         // uncompressed size
@@ -346,4 +365,6 @@ void zip_close(zip* z)
     }
 
     sys_close(z->file);
+
+    sys_realloc(z->files, 0);
 }
