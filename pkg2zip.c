@@ -297,8 +297,8 @@ int main(int argc, char* argv[])
     const char* id2 = id + 13;
 
     // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
-    uint8_t rif[512] = { 0 };
-    if (argc == 3 && strlen(argv[2]) != 32)
+    uint8_t rif[512];
+    if (argc == 3 && !patch)
     {
         zrif_decode(argv[2], rif);
         if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
@@ -395,6 +395,11 @@ int main(int argc, char* argv[])
             pkg_size < enc_offset + data_offset + data_size)
         {
             fatal("ERROR: pkg file is too short, possible corrupted\n");
+        }
+
+        if (name_size >= ZIP_MAX_FILENAME)
+        {
+            fatal("ERROR: pkg file contains file with very long name\n");
         }
 
         char name[ZIP_MAX_FILENAME];
