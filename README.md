@@ -12,7 +12,7 @@ DLC support available when VitaShell will include [this pull request](https://gi
 * **small**, has no external library dependencies and uses very minimal dynamic memory allocations.
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI](https://en.wikipedia.org/wiki/AES_instruction_set) and [SSSE3](https://en.wikipedia.org/wiki/SSSE3) instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
-* **DLC** support.
+* **DLC** and **PATCH** pkg support.
 
 Limitations:
 
@@ -28,9 +28,9 @@ This will create `title [id] [region].zip` file. Title, ID and region is automat
 
 If you don't have zRIF fake license, but just want to unpack files, then omit last argument:
 
-    pkg2zip package.pkg zRIF_STRING
+    pkg2zip package.pkg
 
-Resulting zip file will not include work.bin.
+Resulting zip file will not include work.bin. This is useful for patch pkg files.
 
 # Generating zRIF string
 

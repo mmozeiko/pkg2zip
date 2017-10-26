@@ -20,7 +20,7 @@ static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 
 
 // http://vitadevwiki.com/vita/System_File_Object_(SFO)_(PSF)#Internal_Structure
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
-static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* title, char* content, char* min_version)
+static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, int* patch, char* title, char* content, char* min_version, char* pkg_version)
 {
     uint8_t sfo[16 * 1024];
     if (sfo_size < 16)
@@ -44,15 +44,17 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
 
     int title_index = -1;
     int content_index = -1;
+    int category_index = -1;
     int minver_index = -1;
-    for (uint32_t i=0; i<count; i++)
+    int pkgver_index = -1;
+    for (uint32_t i = 0; i < count; i++)
     {
-        if (i*16 + 20 + 2 > sfo_size)
+        if (i * 16 + 20 + 2 > sfo_size)
         {
             fatal("ERROR: sfo information is too small\n");
         }
 
-        char* key = (char*)sfo + keys + get16le(sfo + i*16 + 20);
+        char* key = (char*)sfo + keys + get16le(sfo + i * 16 + 20);
         if (strcmp(key, "TITLE") == 0)
         {
             if (title_index < 0)
@@ -68,18 +70,26 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
         {
             content_index = (int)i;
         }
+        else if (strcmp(key, "CATEGORY") == 0)
+        {
+            category_index = (int)i;
+        }
         else if (strcmp(key, "PSP2_DISP_VER") == 0)
         {
             minver_index = (int)i;
         }
+        else if (strcmp(key, "APP_VER") == 0)
+        {
+            pkgver_index = (int)i;
+        }
     }
 
-    if (title_index < 0 || content_index < 0)
+    if (title_index < 0 || content_index < 0 || category_index < 0)
     {
         fatal("ERROR: sfo information doesn't have game title or content id, pkg is probably corrupted\n");
     }
 
-    const char* value = (char*)sfo + values + get32le(sfo + title_index*16 + 20 + 12);
+    char* value = (char*)sfo + values + get32le(sfo + title_index*16 + 20 + 12);
     size_t i;
     size_t max = 255;
     for (i=0; i<max && *value; i++, value++)
@@ -111,6 +121,17 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
     }
     *content = 0;
 
+    char* category = value = (char*)sfo + values + get32le(sfo + category_index * 16 + 20 + 12);
+    while (*value++)
+    {
+    }
+    *value = 0;
+
+    if (strcmp(category, "gp") == 0)
+    {
+        *patch = 1;
+    }
+
     value = (char*)sfo + values + get32le(sfo + minver_index * 16 + 20 + 12);
     if (*value == '0')
     {
@@ -128,6 +149,17 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
     {
         *min_version = 0;
     }
+
+    value = (char*)sfo + values + get32le(sfo + pkgver_index * 16 + 20 + 12);
+    if (*value == '0')
+    {
+        value++;
+    }
+    while (*value)
+    {
+        *pkg_version++ = *value++;
+    }
+    *pkg_version = 0;
 }
 
 static const char* get_region(const char* id)
@@ -257,7 +289,10 @@ int main(int argc, char* argv[])
     char content[256];
     char title[256];
     char min_version[256];
-    parse_sfo(pkg, sfo_offset, sfo_size, title, content, min_version);
+    char pkg_version[256];
+    int patch = 0;
+
+    parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
     const char* id = content + 7;
     const char* id2 = id + 13;
 
@@ -277,6 +312,11 @@ int main(int argc, char* argv[])
     {
         snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC].zip", title, id, get_region(id));
         printf("[*] unpacking DLC\n");
+    }
+    else if (patch)
+    {
+        snprintf(path, sizeof(path), "%s [%.9s] [%s] [PATCH] [v%s].zip", title, id, get_region(id), pkg_version);
+        printf("[*] unpacking PATCH\n");
     }
     else
     {
@@ -300,6 +340,14 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "addcont/%.9s/%s/", id, id2);
         zip_add_folder(&z, path);
     }
+    else if (patch)
+    {
+        snprintf(path, sizeof(path), "patch/");
+        zip_add_folder(&z, path);
+
+        snprintf(path, sizeof(path), "patch/%.9s/", id);
+        zip_add_folder(&z, path);
+    }
     else
     {
         snprintf(path, sizeof(path), "app/");
@@ -313,6 +361,10 @@ int main(int argc, char* argv[])
     if (dlc)
     {
         snprintf(root, sizeof(root), "addcont/%.9s/%s", id, id2);
+    }
+    else if (patch)
+    {
+        snprintf(root, sizeof(root), "patch/%.9s", id);
     }
     else
     {
@@ -350,14 +402,6 @@ int main(int argc, char* argv[])
         aes128_ctr_xor(&key, iv, name_offset / 16, (uint8_t*)name, name_size);
         name[name_size] = 0;
 
-        int decrypt = 1;
-
-        if (strcmp("sce_sys/package/digs.bin", name) == 0)
-        {
-            snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
-            decrypt = 0;
-        }
-
         printf("[%u/%u] %s\n", item_index + 1, item_count, name);
 
         if (flags == 4 || flags == 18)
@@ -368,6 +412,13 @@ int main(int argc, char* argv[])
         }
         else
         {
+            int decrypt = 1;
+            if (strcmp("sce_sys/package/digs.bin", name) == 0)
+            {
+                snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
+                decrypt = 0;
+            }
+
             snprintf(path, sizeof(path), "%s/%s", root, name);
 
             uint64_t offset = data_offset;
@@ -433,7 +484,7 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    if (argc == 3)
+    if (argc == 3 && !patch)
     {
         printf("[*] creating fake rif license\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
