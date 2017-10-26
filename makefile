@@ -10,7 +10,7 @@ SRC=${wildcard pkg2zip*.c} puff.c
 OBJ=${SRC:.c=.o}
 DEP=${SRC:.c=.d}
 
-CFLAGS=-pipe -fvisibility=hidden -Wall -Wextra -DNDEBUG -O2
+CFLAGS=-pipe -fvisibility=hidden -Wall -Wextra -Werror -DNDEBUG -O2
 LDFLAGS=-s
 
 .PHONY: all clean
