@@ -18,8 +18,6 @@ static const uint8_t pkg_vita_2[] = { 0xe3, 0x1a, 0x70, 0xc9, 0xce, 0x1d, 0xd7, 
 static const uint8_t pkg_vita_3[] = { 0x42, 0x3a, 0xca, 0x3a, 0x2b, 0xd5, 0x64, 0x9f, 0x96, 0x86, 0xab, 0xad, 0x6f, 0xd8, 0x80, 0x1f };
 static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 0xba, 0xf1, 0x33, 0x89, 0x66, 0x8b, 0x17, 0xd9, 0xea };
 
-static const uint8_t rif_header[] = { 0, 1, 0, 1, 0, 1, 0, 2, 0xef, 0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01 };
-
 // http://vitadevwiki.com/vita/System_File_Object_(SFO)_(PSF)#Internal_Structure
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
 static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* title, char* content, char* min_version)
@@ -161,10 +159,10 @@ static const char* get_region(const char* id)
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.3\n");
+    printf("pkg2zip v1.4\n");
     if (argc < 2 || argc > 3)
     {
-        fatal("Usage: %s file.pkg [NoNpDrmKey | zRIF]\n", argv[0]);
+        fatal("Usage: %s file.pkg [zRIF]\n", argv[0]);
     }
 
     printf("[*] loading...\n");
@@ -202,7 +200,6 @@ int main(int argc, char* argv[])
         fatal("ERROR: pkg file is too small\n");
     }
 
-    uint32_t drm_type = 0;
     uint32_t content_type = 0;
     uint32_t sfo_offset = 0;
     uint32_t sfo_size = 0;
@@ -217,11 +214,7 @@ int main(int argc, char* argv[])
         uint32_t type = get32be(block + 0);
         uint32_t size = get32be(block + 4);
 
-        if (type == 1)
-        {
-            drm_type = get32be(block + 8);
-        }
-        else if (type == 2)
+        if (type == 2)
         {
             content_type = get32be(block + 8);
         }
@@ -287,11 +280,14 @@ int main(int argc, char* argv[])
     if (dlc)
     {
         snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC].zip", title, id, get_region(id));
+        printf("[*] unpacking DLC\n");
     }
     else
     {
         snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, id, get_region(id));
+        printf("[*] unpacking APP\n");
     }
+
     printf("[*] creating '%s' archive\n", path);
 
     zip z;
@@ -304,6 +300,9 @@ int main(int argc, char* argv[])
 
         snprintf(path, sizeof(path), "addcont/%.9s/", id);
         zip_add_folder(&z, path);
+
+        snprintf(path, sizeof(path), "addcont/%.9s/%s/", id, id2);
+        zip_add_folder(&z, path);
     }
     else
     {
@@ -314,18 +313,26 @@ int main(int argc, char* argv[])
         zip_add_folder(&z, path);
     }
 
+    char root[64];
+    if (dlc)
+    {
+        snprintf(root, sizeof(root), "addcont/%.9s/%s", id, id2);
+    }
+    else
+    {
+        snprintf(root, sizeof(root), "app/%.9s", id);
+    }
+
     printf("[*] decrypting...\n");
     aes128_key key;
     aes128_init(&key, main_key);
 
-    uint8_t work_sku_flag = (drm_type == 3 || drm_type == 13) ? 3 : 0;
-
-    for (uint32_t item_index=0; item_index<item_count; item_index++)
+    for (uint32_t item_index = 0; item_index < item_count; item_index++)
     {
         uint8_t item[32];
         uint64_t item_offset = items_offset + item_index * 32;
         sys_read(pkg, enc_offset + item_offset, item, sizeof(item));
-        aes128_ctr_xor(&key, iv, item_offset/16, item, sizeof(item));
+        aes128_ctr_xor(&key, iv, item_offset / 16, item, sizeof(item));
 
         uint32_t name_offset = get32be(item + 0);
         uint32_t name_size = get32be(item + 4);
@@ -344,42 +351,28 @@ int main(int argc, char* argv[])
 
         char name[ZIP_MAX_FILENAME];
         sys_read(pkg, enc_offset + name_offset, name, name_size);
-        aes128_ctr_xor(&key, iv, name_offset/16, (uint8_t*)name, name_size);
+        aes128_ctr_xor(&key, iv, name_offset / 16, (uint8_t*)name, name_size);
         name[name_size] = 0;
 
-        printf("[%u/%u] %s\n", item_index+1, item_count, name);
+        int decrypt = 1;
+
+        if (strcmp("sce_sys/package/digs.bin", name) == 0)
+        {
+            snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
+            decrypt = 0;
+        }
+
+        printf("[%u/%u] %s\n", item_index + 1, item_count, name);
 
         if (flags == 4 || flags == 18)
         {
-            if (dlc)
-            {
-                if (memcmp("sce_sys/package", name, name_size) == 0)
-                {
-                    continue;
-                }
-                snprintf(path, sizeof(path), "addcont/%.9s/%s/%s/", id, id2, name);
-            }
-            else
-            {
-                snprintf(path, sizeof(path), "app/%.9s/%s/", id, name);
-            }
+            snprintf(path, sizeof(path), "%s/%s/", root, name);
+
             zip_add_folder(&z, path);
         }
-        else if (flags <= 3 || (flags >= 14 && flags <= 17) ||
-                 flags == 19 || flags == 21 || flags == 22)
+        else
         {
-            if (dlc)
-            {
-                if (strncmp("sce_sys/package/", name, 16) == 0)
-                {
-                    continue;
-                }
-                snprintf(path, sizeof(path), "addcont/%.9s/%s/%s", id, id2, name);
-            }
-            else
-            {
-                snprintf(path, sizeof(path), "app/%.9s/%s", id, name);
-            }
+            snprintf(path, sizeof(path), "%s/%s", root, name);
 
             uint64_t offset = data_offset;
 
@@ -389,21 +382,12 @@ int main(int argc, char* argv[])
                 uint8_t buffer[1 << 16];
                 uint32_t size = (uint32_t)min64(data_size, sizeof(buffer));
                 sys_read(pkg, enc_offset + offset, buffer, size);
-                aes128_ctr_xor(&key, iv, offset / 16, buffer, size);
 
-                if (memcmp("sce_sys/package/temp.bin", name, name_size) == 0)
+                if (decrypt)
                 {
-                    // process data at beginning of file
-                    if (offset == data_offset)
-                    {
-                        // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L116
-                        uint32_t sku_flag = get32be(buffer + 252);
-                        if (sku_flag == 1 || sku_flag == 3)
-                        {
-                            work_sku_flag = 3;
-                        }
-                    }
+                    aes128_ctr_xor(&key, iv, offset / 16, buffer, size);
                 }
+
                 zip_write_file(&z, buffer, size);
                 offset += size;
                 data_size -= size;
@@ -413,10 +397,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (!dlc)
     {
         printf("[*] creating head.bin\n");
-        snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/head.bin", id);
+        snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
 
         zip_begin_file(&z, path);
         uint64_t head_size = enc_offset + items_size;
@@ -431,9 +414,11 @@ int main(int argc, char* argv[])
             head_offset += size;
         }
         zip_end_file(&z);
+    }
 
+    {
         printf("[*] creating tail.bin\n");
-        snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/tail.bin", id);
+        snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
         uint8_t tail[480];
         zip_begin_file(&z, path);
@@ -442,55 +427,32 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    if (dlc)
     {
-        zip_add_folder(&z, "license/");
-        zip_add_folder(&z, "license/addcont/");
+        printf("[*] creating stat.bin\n");
+        snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
-        snprintf(path, sizeof(path), "license/addcont/%.9s/", id);
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "license/addcont/%.9s/%s/", id, id2);
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "license/addcont/%.9s/%s/6488b73b912a753a492e2714e9b38bc7.rif", id, id2);
-    }
-    else
-    {
-        snprintf(path, sizeof(path), "app/%.9s/sce_sys/package/work.bin", id);
+        uint8_t stat[768] = { 0 };
+        zip_begin_file(&z, path);
+        zip_write_file(&z, stat, sizeof(stat));
+        zip_end_file(&z);
     }
 
     if (argc == 3)
     {
-        if (strlen(argv[2]) == 32)
-        {
-            printf("[*] generating rif file with '%s' key\n", argv[2]);
+        printf("[*] creating fake rif license\n");
+        snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
 
-            memcpy(rif, rif_header, sizeof(rif_header));
-            memcpy(rif + 0x10, content, 0x30);
-            get_hex_bytes16(argv[2], rif + 0x50);
-            rif[255] = work_sku_flag;
-        }
-        else
-        {
-            printf("[*] saving zRIF to rif file\n");
-        }
+        zip_begin_file(&z, path);
+        zip_write_file(&z, rif, sizeof(rif));
+        zip_end_file(&z);
     }
-    else
-    {
-        printf("[*] creating dummy rif file\n");
-
-        memcpy(rif, rif_header, sizeof(rif_header));
-        memcpy(rif + 0x10, id, 0x30);
-        rif[255] = work_sku_flag;
-    }
-
-    zip_begin_file(&z, path);
-    zip_write_file(&z, rif, sizeof(rif));
-    zip_end_file(&z);
 
     zip_close(&z);
 
-    printf("[*] minimum fw version required: %s\n", min_version);
+    if (!dlc)
+    {
+        printf("[*] minimum fw version required: %s\n", min_version);
+    }
+
     printf("[*] done!\n");
 }

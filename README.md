@@ -4,6 +4,8 @@ Utility that decrypts PlayStation Vita pkg file and creates zip package.
 
 Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license into work.bin file. You must provide license key.
 
+DLC support available when VitaShell will include [this pull request](https://github.com/TheOfficialFloW/VitaShell/pull/310).
+
 # Features
 
 * **portable**, written in cross-platform C code, runs on Windows, GNU/Linux, macOS (system dependent functionality is isolated in sys.c file).
@@ -12,15 +14,22 @@ Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license i
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 
 Limitations:
-* currently works only for main application pkg files, no DLC.
+
+* currently no PSM or update pkg files are supported.
 
 # Usage
 
-Execute `pkg2zip package.pkg` to create `title [id] [region].zip` file. Title, ID and region is automatically detected from pkg file.
+If you have zRIF fake license, then execute:
 
-If you have raw license key (32 hex characters) you can execute `pkg2zip package.pkg hexkey` to try to generate work.bin file (works for most pkg files).
+    pkg2zip package.pkg zRIF_STRING
 
-If you have working zRIF string, then execute `pkg2zip package.pkg zRIF_string` to create work.bin file from zRIF encoding.
+This will create `title [id] [region].zip` file. Title, ID and region is automatically detected from pkg file. It will include work.bin file.
+
+If you don't have zRIF fake license, but just want to unpack files, then omit last argument:
+
+    pkg2zip package.pkg zRIF_STRING
+
+Resulting zip file will not include work.bin.
 
 # Generating zRIF string
 
@@ -56,7 +65,6 @@ On Windows you can build either with MinGW (get [MinGW-w64](http://www.msys2.org
 
 * https://github.com/RikuKH3/unpkg_vita
 * https://github.com/St4rk/PkgDecrypt
-* https://github.com/TheRadziu/PkgDecrypt
 * https://github.com/weaknespase/PkgDecrypt
 
 # License

@@ -9,7 +9,6 @@
 #endif
 
 void NORETURN fatal(const char* msg, ...) ;
-void get_hex_bytes16(const char* str, uint8_t* bytes);
 
 static inline uint32_t min32(uint32_t a, uint32_t b)
 {
