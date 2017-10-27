@@ -216,6 +216,7 @@ int main(int argc, char* argv[])
     uint32_t item_count = get32be(pkg_header + 20);
     uint64_t total_size = get64be(pkg_header + 24);
     uint64_t enc_offset = get64be(pkg_header + 32);
+    uint64_t enc_size = get64be(pkg_header + 40);
     const uint8_t* iv = pkg_header + 0x70;
     int key_type = pkg_header[0xe7] & 7;
 
@@ -472,10 +473,16 @@ int main(int argc, char* argv[])
         printf("[*] creating tail.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
-        uint8_t tail[480];
         zip_begin_file(&z, path);
-        sys_read(pkg, total_size - sizeof(tail), tail, sizeof(tail));
-        zip_write_file(&z, tail, sizeof(tail));
+        uint64_t tail_offset = enc_offset + enc_size;
+        while (tail_offset != pkg_size)
+        {
+            uint8_t buffer[1 << 16];
+            uint32_t size = (uint32_t)min64(pkg_size - tail_offset, sizeof(buffer));
+            sys_read(pkg, tail_offset, buffer, size);
+            zip_write_file(&z, buffer, size);
+            tail_offset += size;
+        }
         zip_end_file(&z);
     }
 
@@ -491,7 +498,7 @@ int main(int argc, char* argv[])
 
     if (argc == 3 && !patch)
     {
-        printf("[*] creating fake rif license\n");
+        printf("[*] creating work.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
 
         zip_begin_file(&z, path);
