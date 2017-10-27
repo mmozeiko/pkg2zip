@@ -286,18 +286,22 @@ void zip_close(zip* z)
         // zip64 Extended Information Extra Field
         set16le(extra + 0, 1);
         // size of this "extra" block
-        set16le(extra + 2, extra_size - 2*sizeof(uint16_t));
+        uint32_t extra_offset = 2 * sizeof(uint16_t);
+        set16le(extra + 2, extra_size - extra_offset);
         if (size > 0xffffffff)
         {
             // original uncompressed file size
-            set64le(extra + 4, size);
+            set64le(extra + extra_offset, size);
+            extra_offset += sizeof(uint64_t);
             // size of compressed data
-            set64le(extra + 12, size);
+            set64le(extra + extra_offset, size);
+            extra_offset += sizeof(uint64_t);
         }
         if (offset > 0xffffffff)
         {
             // offset of local header record
-            set64le(extra + 20, offset);
+            set64le(extra + extra_offset, offset);
+            extra_offset += sizeof(uint64_t);
         }
 
         if (extra_size > 2 * sizeof(uint16_t))
@@ -308,7 +312,7 @@ void zip_close(zip* z)
     }
 
     uint64_t end_of_central_dir_offset = z->total;
-    uint32_t central_dir_size = (uint32_t)(end_of_central_dir_offset - central_dir_offset);
+    uint64_t central_dir_size = end_of_central_dir_offset - central_dir_offset;
 
     // zip64 end of central directory record
     {
@@ -319,10 +323,6 @@ void zip_close(zip* z)
         set16le(header + 12, ZIP_VERSION);
         // version needed to extract
         set16le(header + 14, ZIP_VERSION);
-        // number of this disk
-        set32le(header + 16, 0);
-        // number of the disk with the start of the central directory
-        set32le(header + 20, 0);
         // total number of entries in the central directory on this disk
         set64le(header + 24, z->count);
         // total number of entries in the central directory
@@ -352,11 +352,11 @@ void zip_close(zip* z)
     {
         uint8_t header[ZIP_EOC_DIR_SIZE] = { 0x50, 0x4b, 0x05, 0x06 };
         // total number of entries in the central directory on this disk
-        set16le(header + 8, (uint16_t)z->count);
+        set16le(header + 8, (uint16_t)min32(z->count, 0xffff));
         // total number of entries in the central directory
-        set16le(header + 10, (uint16_t)z->count);
+        set16le(header + 10, (uint16_t)min32(z->count, 0xffff));
         // size of the central directory
-        set32le(header + 12, central_dir_size);
+        set32le(header + 12, (uint32_t)min64(central_dir_size, 0xffffffff));
         // offset of start of central directory with respect to the starting disk number
         set32le(header + 16, (uint32_t)min64(central_dir_offset, 0xffffffff));
 
