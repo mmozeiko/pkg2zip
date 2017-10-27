@@ -310,7 +310,7 @@ int main(int argc, char* argv[])
     char path[1024];
     if (dlc)
     {
-        snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC].zip", title, id, get_region(id));
+        snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC-%s].zip", title, id, get_region(id), id2);
         printf("[*] unpacking DLC\n");
     }
     else if (patch)
