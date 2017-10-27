@@ -18,7 +18,7 @@ DLC support available when VitaShell will include [this pull request](https://gi
 
 Limitations:
 
-* currently no PSM or update pkg files are supported.
+* currently no PSM pkg files are supported.
 
 # Usage
 
