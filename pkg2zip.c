@@ -397,8 +397,9 @@ int main(int argc, char* argv[])
     char path[1024];
     if (psp)
     {
-        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, pkg_header + 0x37, content_type == 6 ? "PSX" : content_type == 7 ? "PSP" : "PSPMini");
-        printf("[*] unpacking PSP\n");
+        const char* type_str = content_type == 6 ? "PSX" : content_type == 7 ? "PSP" : "PSPMini";
+        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, pkg_header + 0x37, type_str);
+        printf("[*] unpacking %s\n", type_str);
     }
     else if (dlc)
     {
