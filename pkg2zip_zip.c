@@ -287,7 +287,7 @@ void zip_close(zip* z)
         set16le(extra + 0, 1);
         // size of this "extra" block
         uint32_t extra_offset = 2 * sizeof(uint16_t);
-        set16le(extra + 2, extra_size - extra_offset);
+        set16le(extra + 2, (uint16_t)(extra_size - extra_offset));
         if (size > 0xffffffff)
         {
             // original uncompressed file size
