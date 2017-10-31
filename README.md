@@ -2,23 +2,23 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Supports also PSX files for use with [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline).
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Supports also PSX files for use with [Adrenaline][].
 
-Optionally writes [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) or  [NoPsmDrm](https://github.com/frangarcj/NoPsmDrm) fake license file from zRIF string. You must provide license key.
+Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string. You must provide license key.
 
 # Requirements
 
-* [Henkaku](https://henkaku.xyz/) / [Enso](https://enso.henkaku.xyz/)
-* [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm)
-* [NoPsmDrm](https://github.com/frangarcj/NoPsmDrm) for PSM titles
-* to use DLC pkg files, [VitaShell](https://github.com/TheOfficialFloW/VitaShell) **v1.76** or newer required
-* [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline) for PSX titles
+* [Henkaku][] / [Enso][]
+* [NoNpDrm][]
+* [NoPsmDrm][] for PSM titles
+* [VitaShell][] **v1.76** or newer required for DLC installation
+* [Adrenaline][] for PSX titles
 
 # Features
 
 * **portable**, written in cross-platform C code, runs on Windows, GNU/Linux, macOS (system dependent functionality is isolated in sys.c file).
 * **small**, has no external library dependencies and uses very minimal dynamic memory allocations.
-* **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI](https://en.wikipedia.org/wiki/AES_instruction_set) and [SSSE3](https://en.wikipedia.org/wiki/SSSE3) instructions).
+* **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **DLC**, **PATCH** and **PSM** pkg unpacking.
 * **PSX** pkg unpacking.
@@ -64,9 +64,9 @@ Last argument is optional, it specifies where to save file and defaults to work.
 
 # Download
 
-Get latest Windows binaries [here](https://github.com/mmozeiko/pkg2zip/releases).
+Get latest Windows binaries [here][downloads].
 
-ArchLinux users can build binary with [pkg2zip](https://aur.archlinux.org/packages/pkg2zip/) package in AUR repository. For example, with pacaur:
+ArchLinux users can build binary with [pkg2zip][AUR] package in AUR repository. For example, with pacaur:
 
     $ pacaur -S pkg2zip
 
@@ -74,7 +74,7 @@ ArchLinux users can build binary with [pkg2zip](https://aur.archlinux.org/packag
 
 Execute `make` if you are on GNU/Linux or macOS.
 
-On Windows you can build either with MinGW (get [MinGW-w64](http://www.msys2.org/)) or [Visual Studio 2017 Community Edition](https://www.visualstudio.com/vs/community/).
+On Windows you can build either with MinGW (get [MinGW-w64][]) or [Visual Studio 2017 Community Edition][vs2017ce].
 * for MinGW make sure you have make installed, and then execute `mingw32-make`
 * for Visual Studio run `build.cmd`
 
@@ -100,3 +100,14 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
 [img_downloads]: https://img.shields.io/github/downloads/mmozeiko/pkg2zip/total.svg?maxAge=3600
 [img_latest]: https://img.shields.io/github/release/mmozeiko/pkg2zip.svg?maxAge=3600
 [img_license]: https://img.shields.io/github/license/mmozeiko/pkg2zip.svg?maxAge=2592000
+[Adrenaline]: https://github.com/TheOfficialFloW/Adrenaline
+[NoNpDrm]: https://github.com/TheOfficialFloW/NoNpDrm
+[NoPsmDrm]: https://github.com/frangarcj/NoPsmDrm
+[Henkaku]: https://henkaku.xyz/
+[Enso]: https://enso.henkaku.xyz/
+[VitaShell]: https://github.com/TheOfficialFloW/VitaShell
+[AESNI]: https://en.wikipedia.org/wiki/AES_instruction_set
+[SSSE3]: https://en.wikipedia.org/wiki/SSSE3
+[AUR]: https://aur.archlinux.org/packages/pkg2zip/
+[MinGW-w64]: http://www.msys2.org/
+[vs2017ce]: https://www.visualstudio.com/vs/community/
