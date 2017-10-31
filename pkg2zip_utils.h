@@ -5,16 +5,10 @@
 
 #if defined(_MSC_VER)
 #  define NORETURN __declspec(noreturn)
+#  define PKG_ALIGN(x) __declspec(align(x))
 #else
 #  define NORETURN __attribute__((noreturn))
-#endif
-
-#if defined(_MSC_VER)
-#  define MSVC_ALIGN(x) __declspec(align(x))
-#  define GCC_ALIGN(x)
-#else
-#  define MSVC_ALIGN(x)
-#  define GCC_ALIGN(x) __attribute__((aligned(x)))
+#  define PKG_ALIGN(x) __attribute__((aligned(x)))
 #endif
 
 void NORETURN fatal(const char* msg, ...);

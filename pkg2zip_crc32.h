@@ -3,7 +3,7 @@
 #include "pkg2zip_utils.h"
 
 typedef struct {
-    MSVC_ALIGN(16) uint32_t crc GCC_ALIGN(16);
+    uint32_t PKG_ALIGN(16) crc[4 * 5];
 } crc32_ctx;
 
 void crc32_init(crc32_ctx* ctx);

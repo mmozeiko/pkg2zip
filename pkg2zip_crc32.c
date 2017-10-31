@@ -5,6 +5,55 @@
 #include <endian.h>
 #endif
 
+#if defined(_MSC_VER)
+#define PLATFORM_SUPPORTS_PCLMUL 1
+
+#include <intrin.h>
+static void get_cpuid(uint32_t level, uint32_t* arr)
+{
+    __cpuidex((int*)arr, level, 0);
+}
+
+#elif defined(__x86_64__) || defined(__i386__)
+#define PLATFORM_SUPPORTS_PCLMUL 1
+
+#include <cpuid.h>
+static void get_cpuid(uint32_t level, uint32_t* arr)
+{
+    __cpuid_count(level, 0, arr[0], arr[1], arr[2], arr[3]);
+}
+
+#else
+#define PLATFORM_SUPPORTS_PCLMUL 0
+#endif
+
+#if PLATFORM_SUPPORTS_PCLMUL
+static int crc32_supported_x86()
+{
+    static int init = 0;
+    static int supported;
+    if (!init)
+    {
+        init = 1;
+
+        uint32_t a[4];
+        get_cpuid(0, a);
+
+        if (a[0] >= 1)
+        {
+            get_cpuid(1, a);
+            supported = ((a[2] & (1 << 9)) && (a[2] & (1 << 1)) && (a[2] & (1 << 19)));
+        }
+    }
+    return supported;
+}
+
+void crc32_init_x86(crc32_ctx* ctx);
+void crc32_update_x86(crc32_ctx* ctx, const void* buffer, size_t size);
+uint32_t crc32_done_x86(crc32_ctx* ctx);
+
+#endif
+
 static const uint32_t crc32[4][256] =
 {
     {
@@ -147,13 +196,28 @@ static const uint32_t crc32[4][256] =
 
 void crc32_init(crc32_ctx* ctx)
 {
-    ctx->crc = 0xffffffff;
+#if PLATFORM_SUPPORTS_PCLMUL
+    if (crc32_supported_x86())
+    {
+        crc32_init_x86(ctx);
+        return;
+    }
+#endif
+    ctx->crc[0] = 0xffffffff;
 }
 
 void crc32_update(crc32_ctx* ctx, const void* buffer, size_t size)
 {
+#if PLATFORM_SUPPORTS_PCLMUL
+    if (crc32_supported_x86())
+    {
+        crc32_update_x86(ctx, buffer, size);
+        return;
+    }
+#endif
+
     const uint8_t* buffer8 = buffer;
-    uint32_t value = ctx->crc;
+    uint32_t value = ctx->crc[0];
     while (size >= 4)
     {
 #if defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN
@@ -180,10 +244,17 @@ void crc32_update(crc32_ctx* ctx, const void* buffer, size_t size)
         value = (value >> 8) ^ crc32[0][(uint8_t)value ^ *buffer8++];
     }
 
-    ctx->crc = value;
+    ctx->crc[0] = value;
 }
 
 uint32_t crc32_done(crc32_ctx* ctx)
 {
-    return ~ctx->crc;
+#if PLATFORM_SUPPORTS_PCLMUL
+    if (crc32_supported_x86())
+    {
+        return crc32_done_x86(ctx);
+    }
+#endif
+
+    return ~ctx->crc[0];
 }

@@ -24,9 +24,13 @@ ${BIN}: ${OBJ}
 	@echo [L] $@
 	@${CC} ${LDFLAGS} -o $@ $^
 
-%_x86.o: %_x86.c
+%aes_x86.o: %aes_x86.c
 	@echo [C] $<
 	@${CC} ${CFLAGS} -maes -mssse3 -MMD -c -o $@ $<
+
+%crc32_x86.o: %crc32_x86.c
+	@echo [C] $<
+	@${CC} ${CFLAGS} -mpclmul -msse4 -MMD -c -o $@ $<
 
 %.o: %.c
 	@echo [C] $<

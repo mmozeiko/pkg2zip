@@ -3,7 +3,7 @@
 #include "pkg2zip_utils.h"
 
 typedef struct {
-    MSVC_ALIGN(16) uint32_t key[44] GCC_ALIGN(16);
+    uint32_t PKG_ALIGN(16) key[44];
 } aes128_key;
 
 void aes128_init(aes128_key* context, const uint8_t* key);
