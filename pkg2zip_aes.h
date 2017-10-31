@@ -1,15 +1,6 @@
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
-
-#if defined(_MSC_VER)
-#  define MSVC_ALIGN(x) __declspec(align(x))
-#  define GCC_ALIGN(x)
-#else
-#  define MSVC_ALIGN(x)
-#  define GCC_ALIGN(x) __attribute__((aligned(x)))
-#endif
+#include "pkg2zip_utils.h"
 
 typedef struct {
     MSVC_ALIGN(16) uint32_t key[44] GCC_ALIGN(16);

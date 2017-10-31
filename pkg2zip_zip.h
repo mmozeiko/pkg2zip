@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pkg2zip_sys.h"
+#include "pkg2zip_crc32.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -16,6 +17,7 @@ typedef struct {
     uint32_t max;
     uint16_t time;
     uint16_t date;
+    crc32_ctx crc32;
     uint32_t allocated; // bytes
     zip_file* files;
     zip_file* current;
