@@ -5,6 +5,8 @@
 
 typedef void* sys_file;
 
+void sys_mkdir(const char* path);
+
 sys_file sys_open(const char* fname, uint64_t* size);
 sys_file sys_create(const char* fname);
 void sys_close(sys_file file);
@@ -15,3 +17,5 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 // if ptr && !size => free
 // if ptr && size => realloc
 void* sys_realloc(void* ptr, size_t size);
+
+void sys_vstrncat(char* dst, size_t n, const char* format, ...);

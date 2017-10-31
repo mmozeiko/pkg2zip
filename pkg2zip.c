@@ -261,18 +261,119 @@ static const char* get_region(const char* id)
     }
 }
 
+static zip out_zip;
+static int out_zipped;
+static sys_file out_file;
+static uint64_t out_file_offset;
+
+static void out_begin(const char* name, int zipped)
+{
+    if (zipped)
+    {
+        zip_create(&out_zip, name);
+    }
+    else
+    {
+        sys_mkdir(name);
+    }
+    out_zipped = zipped;
+}
+
+static void out_end(void)
+{
+    if (out_zipped)
+    {
+        zip_close(&out_zip);
+    }
+}
+
+static void out_add_folder(const char* path)
+{
+    if (out_zipped)
+    {
+        zip_add_folder(&out_zip, path);
+    }
+    else
+    {
+        sys_mkdir(path);
+    }
+}
+
+static void out_begin_file(const char* name)
+{
+    if (out_zipped)
+    {
+        zip_begin_file(&out_zip, name);
+    }
+    else
+    {
+        out_file = sys_create(name);
+        out_file_offset = 0;
+    }
+}
+
+static void out_end_file(void)
+{
+    if (out_zipped)
+    {
+        zip_end_file(&out_zip);
+    }
+    else
+    {
+        sys_close(out_file);
+    }
+}
+
+static void out_write(const void* buffer, uint32_t size)
+{
+    if (out_zipped)
+    {
+        zip_write_file(&out_zip, buffer, size);
+    }
+    else
+    {
+        sys_write(out_file, out_file_offset, buffer, size);
+        out_file_offset += size;
+    }
+}
+
 int main(int argc, char* argv[])
 {
     printf("pkg2zip v1.5\n");
-    if (argc < 2 || argc > 3)
+
+    int zipped = 1;
+    const char* pkg_arg = NULL;
+    const char* zrif_arg = NULL;
+    for (int i = 1; i < argc; i++)
     {
-        fatal("Usage: %s file.pkg [zRIF]\n", argv[0]);
+        if (strcmp(argv[i], "-x") == 0)
+        {
+            zipped = 0;
+        }
+        else
+        {
+            if (pkg_arg != NULL)
+            {
+                zrif_arg = argv[i];
+                break;
+            }
+            else
+            {
+                pkg_arg = argv[i];
+            }
+        }
+    }
+
+    if (pkg_arg == NULL)
+    {
+        fprintf(stderr, "ERROR: no pkg file specified\n");
+        fatal("Usage: %s [-x] file.pkg [zRIF]\n", argv[0]);
     }
 
     printf("[*] loading...\n");
 
     uint64_t pkg_size;
-    sys_file pkg = sys_open(argv[1], &pkg_size);
+    sys_file pkg = sys_open(pkg_arg, &pkg_size);
 
     uint8_t pkg_header[PKG_HEADER_SIZE + PKG_HEADER_EXT_SIZE];
     sys_read(pkg, 0, pkg_header, sizeof(pkg_header));
@@ -385,9 +486,9 @@ int main(int argc, char* argv[])
     {
         parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
 
-        if (argc == 3 && !patch)
+        if (!patch && zrif_arg != NULL)
         {
-            zrif_decode(argv[2], rif);
+            zrif_decode(zrif_arg, rif);
             if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
             {
                 fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif + 0x10, content);
@@ -395,98 +496,106 @@ int main(int argc, char* argv[])
         }
     }
 
-    char path[1024];
+    const char* ext = zipped ? ".zip" : "";
+
+    char root[1024];
     if (psp)
     {
         id = (char*)pkg_header + 0x37;
         const char* type_str = content_type == 7 ? "PSP" : "PSPMini";
-        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, id, type_str);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
         printf("[*] unpacking %s\n", type_str);
     }
     else if (psx)
     {
         id = (char*)pkg_header + 0x37;
-        snprintf(path, sizeof(path), "%s [%.9s] [PSX].zip", title, id);
+        snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
         printf("[*] unpacking PSX\n");
     }
     else if (dlc)
     {
-        snprintf(path, sizeof(path), "%s [%.9s] [%s] [DLC-%s].zip", title, id, get_region(id), id2);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
         printf("[*] unpacking DLC\n");
     }
     else if (patch)
     {
-        snprintf(path, sizeof(path), "%s [%.9s] [%s] [PATCH] [v%s].zip", title, id, get_region(id), pkg_version);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
         printf("[*] unpacking PATCH\n");
     }
     else
     {
-        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, id, get_region(id));
+        snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
         printf("[*] unpacking APP\n");
     }
 
-    printf("[*] creating '%s' archive\n", path);
+    out_begin(root, zipped);
 
-    zip z;
-    zip_create(&z, path);
-
-    char root[64];
-
-    if (psp)
+    if (zipped)
     {
+        printf("[*] creating '%s' archive\n", root);
         root[0] = 0;
-    }
-    else if (psx)
-    {
-        snprintf(path, sizeof(path), "pspemu/");
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "pspemu/PSP/");
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "pspemu/PSP/GAME/");
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/", id);
-        zip_add_folder(&z, path);
-
-        snprintf(root, sizeof(root), "pspemu/PSP/GAME/%.9s", id);
-    }
-    else if (dlc)
-    {
-        snprintf(path, sizeof(path), "addcont/");
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "addcont/%.9s/", id);
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "addcont/%.9s/%s/", id, id2);
-        zip_add_folder(&z, path);
-
-        snprintf(root, sizeof(root), "addcont/%.9s/%s", id, id2);
-    }
-    else if (patch)
-    {
-        snprintf(path, sizeof(path), "patch/");
-        zip_add_folder(&z, path);
-
-        snprintf(path, sizeof(path), "patch/%.9s/", id);
-        zip_add_folder(&z, path);
-
-        snprintf(root, sizeof(root), "patch/%.9s", id);
     }
     else
     {
-        snprintf(path, sizeof(path), "app/");
-        zip_add_folder(&z, path);
+        printf("[*] output to '%s' folder\n", root);
+        sys_vstrncat(root, sizeof(root), "/");
+    }
 
-        snprintf(path, sizeof(path), "app/%.9s/", id);
-        zip_add_folder(&z, path);
+    if (psp)
+    {
+    }
+    else if (psx)
+    {
+        sys_vstrncat(root, sizeof(root), "pspemu");
+        out_add_folder(root);
 
-        snprintf(root, sizeof(root), "app/%.9s/", id);
+        sys_vstrncat(root, sizeof(root), "/PSP");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/GAME");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/");
+    }
+    else if (dlc)
+    {
+        sys_vstrncat(root, sizeof(root), "addcont");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%s", id2);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/");
+    }
+    else if (patch)
+    {
+        sys_vstrncat(root, sizeof(root), "patch");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/");
+    }
+    else
+    {
+        sys_vstrncat(root, sizeof(root), "app");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/");
     }
 
     printf("[*] decrypting...\n");
+    char path[1024];
 
     for (uint32_t item_index = 0; item_index < item_count; item_index++)
     {
@@ -537,8 +646,8 @@ int main(int argc, char* argv[])
         {
             if (!psx)
             {
-                snprintf(path, sizeof(path), "%s/%s/", root, name);
-                zip_add_folder(&z, path);
+                snprintf(path, sizeof(path), "%s%s/", root, name);
+                out_add_folder(path);
             }
         }
         else
@@ -554,11 +663,11 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/DOCUMENT.DAT", root);
+                    snprintf(path, sizeof(path), "%sDOCUMENT.DAT", root);
                 }
                 else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/EBOOT.PBP", root);
+                    snprintf(path, sizeof(path), "%sEBOOT.PBP", root);
                 }
                 else
                 {
@@ -567,12 +676,12 @@ int main(int argc, char* argv[])
             }
             else
             {
-                snprintf(path, sizeof(path), "%s/%s", root, name);
+                snprintf(path, sizeof(path), "%s%s", root, name);
             }
 
             uint64_t offset = data_offset;
 
-            zip_begin_file(&z, path);
+            out_begin_file(path);
             while (data_size != 0)
             {
                 uint8_t buffer[1 << 16];
@@ -584,21 +693,21 @@ int main(int argc, char* argv[])
                     aes128_ctr_xor(item_key, iv, offset / 16, buffer, size);
                 }
 
-                zip_write_file(&z, buffer, size);
+                out_write(buffer, size);
                 offset += size;
                 data_size -= size;
             }
 
-            zip_end_file(&z);
+            out_end_file();
         }
     }
 
     if (!psp && !psx)
     {
         printf("[*] creating head.bin\n");
-        snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
+        snprintf(path, sizeof(path), "%ssce_sys/package/head.bin", root);
 
-        zip_begin_file(&z, path);
+        out_begin_file(path);
         uint64_t head_size = enc_offset + items_size;
         uint64_t head_offset = 0;
         while (head_size != 0)
@@ -606,53 +715,53 @@ int main(int argc, char* argv[])
             uint8_t buffer[1 << 16];
             uint32_t size = (uint32_t)min64(head_size, sizeof(buffer));
             sys_read(pkg, head_offset, buffer, size);
-            zip_write_file(&z, buffer, size);
+            out_write(buffer, size);
             head_size -= size;
             head_offset += size;
         }
-        zip_end_file(&z);
+        out_end_file();
     }
 
     if (!psp && !psx)
     {
         printf("[*] creating tail.bin\n");
-        snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
+        snprintf(path, sizeof(path), "%ssce_sys/package/tail.bin", root);
 
-        zip_begin_file(&z, path);
+        out_begin_file(path);
         uint64_t tail_offset = enc_offset + enc_size;
         while (tail_offset != pkg_size)
         {
             uint8_t buffer[1 << 16];
             uint32_t size = (uint32_t)min64(pkg_size - tail_offset, sizeof(buffer));
             sys_read(pkg, tail_offset, buffer, size);
-            zip_write_file(&z, buffer, size);
+            out_write(buffer, size);
             tail_offset += size;
         }
-        zip_end_file(&z);
+        out_end_file();
     }
 
     if (!psp && !psx)
     {
         printf("[*] creating stat.bin\n");
-        snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
+        snprintf(path, sizeof(path), "%ssce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
-        zip_begin_file(&z, path);
-        zip_write_file(&z, stat, sizeof(stat));
-        zip_end_file(&z);
+        out_begin_file(path);
+        out_write(stat, sizeof(stat));
+        out_end_file();
     }
 
-    if (!psp && !psx && !patch && argc == 3)
+    if (!psp && !psx && !patch && zrif_arg != NULL)
     {
         printf("[*] creating work.bin\n");
-        snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
+        snprintf(path, sizeof(path), "%ssce_sys/package/work.bin", root);
 
-        zip_begin_file(&z, path);
-        zip_write_file(&z, rif, sizeof(rif));
-        zip_end_file(&z);
+        out_begin_file(path);
+        out_write(rif, sizeof(rif));
+        out_end_file();
     }
 
-    zip_close(&z);
+    out_end();
 
     if (!psp && !psx && !dlc)
     {

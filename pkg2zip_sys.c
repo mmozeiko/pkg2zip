@@ -2,11 +2,28 @@
 #include "pkg2zip_utils.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
 
 #if defined(_WIN32)
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
+static void sys_mkdir_real(const char* path)
+{
+    WCHAR wpath[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, MAX_PATH);
+
+    if (CreateDirectoryW(wpath, NULL) == 0)
+    {
+        if (GetLastError() != ERROR_ALREADY_EXISTS)
+        {
+            fatal("ERROR: cannot create '%s' folder\n", path);
+        }
+    }
+}
 
 sys_file sys_open(const char* fname, uint64_t* size)
 {
@@ -82,8 +99,20 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 #define _FILE_OFFSET_BITS 64
 #include <stdio.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
+
+static void sys_mkdir_real(const char* path)
+{
+    if (mkdir(path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0)
+    {
+        if (errno != EEXIST)
+        {
+            fatal("ERROR: cannot create '%s' folder\n", path);
+        }
+    }
+}
 
 sys_file sys_open(const char* fname, uint64_t* size)
 {
@@ -142,6 +171,18 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 
 #endif
 
+void sys_mkdir(const char* path)
+{
+    char* last = strrchr(path, '/');
+    if (last)
+    {
+        *last = 0;
+        sys_mkdir(path);
+        *last = '/';
+    }
+    sys_mkdir_real(path);
+}
+
 void* sys_realloc(void* ptr, size_t size)
 {
     void* result = NULL;
@@ -169,4 +210,16 @@ void* sys_realloc(void* ptr, size_t size)
     }
 
     return result;
+}
+
+void sys_vstrncat(char* dst, size_t n, const char* format, ...)
+{
+    char temp[1024];
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(temp, sizeof(temp), format, args);
+    va_end(args);
+
+    strncat(dst, temp, n - strlen(dst) - 1);
 }

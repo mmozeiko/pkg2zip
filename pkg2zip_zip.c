@@ -1,8 +1,6 @@
 #if defined(__MINGW32__) && !defined(__x86_64__)
 #  define _USE_32BIT_TIME_T
 #  define __CRT__NO_INLINE
-#elif defined(_MSC_VER)
-#  define _CRT_SECURE_NO_DEPRECATE
 #endif
 
 #include "pkg2zip_zip.h"
@@ -102,7 +100,7 @@ void zip_create(zip* z, const char* name)
 
 void zip_add_folder(zip* z, const char* name)
 {
-    size_t name_length = strlen(name);
+    size_t name_length = strlen(name) + 1;
     if (name_length > ZIP_MAX_FILENAME)
     {
         fatal("ERROR: dirname too long\n");
@@ -131,7 +129,11 @@ void zip_add_folder(zip* z, const char* name)
     z->total += sizeof(header);
 
     sys_write(z->file, z->total, name, (uint16_t)name_length);
-    z->total += name_length;
+    z->total += name_length - 1;
+
+    char slash = '/';
+    sys_write(z->file, z->total, &slash, 1);
+    z->total += 1;
 }
 
 void zip_begin_file(zip* z, const char* name)
