@@ -171,17 +171,17 @@ static uint32_t zlib_inflate(const uint8_t* in, uint32_t inlen, uint8_t* out, ui
     return dlen;
 }
 
-void zrif_decode(const char* str, uint8_t* rif)
+void zrif_decode(const char* str, uint8_t* rif, uint32_t rif_size)
 {
-    uint8_t raw[512];
+    uint8_t raw[1024];
     uint32_t len = base64_decode(str, raw);
 
-    uint8_t out[512 + sizeof(zrif_dict)];
+    uint8_t out[sizeof(zrif_dict) + 1024];
     len = zlib_inflate(raw, len, out, sizeof(out));
-    if (len != 512)
+    if (len != rif_size)
     {
         fatal("ERROR: wrong size of zRIF, is it corrupted?\n");
     }
 
-    memcpy(rif, out, 512);
+    memcpy(rif, out, rif_size);
 }

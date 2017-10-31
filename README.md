@@ -2,14 +2,15 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package. Supports also PSX pkg files for use with [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline).
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Supports also PSX files for use with [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline).
 
-Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license into work.bin file. You must provide license key.
+Optionally writes [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) or  [NoPsmDrm](https://github.com/frangarcj/NoPsmDrm) fake license file from zRIF string. You must provide license key.
 
 # Requirements
 
 * [Henkaku](https://henkaku.xyz/) / [Enso](https://enso.henkaku.xyz/)
 * [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm)
+* [NoPsmDrm](https://github.com/frangarcj/NoPsmDrm) for PSM titles
 * to use DLC pkg files, [VitaShell](https://github.com/TheOfficialFloW/VitaShell) **v1.76** or newer required
 * [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline) for PSX titles
 
@@ -19,12 +20,13 @@ Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license i
 * **small**, has no external library dependencies and uses very minimal dynamic memory allocations.
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI](https://en.wikipedia.org/wiki/AES_instruction_set) and [SSSE3](https://en.wikipedia.org/wiki/SSSE3) instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
-* **DLC** and **PATCH** pkg unpacking.
+* **DLC**, **PATCH** and **PSM** pkg unpacking.
 * **PSX** pkg unpacking.
 
 Limitations:
 
-* currently no PSM, PSP or PSP Mini pkg files are supported.
+* currently no PSP or PSP Mini pkg files are supported.
+* currently no actual title name is extracted for PSM pkg files.
 
 # Usage
 

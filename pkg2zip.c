@@ -236,22 +236,25 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
 
 static const char* get_region(const char* id)
 {
-    if (memcmp(id, "PCSE", 4) == 0 || memcmp(id, "PCSA", 4) == 0)
+    if (memcmp(id, "PCSE", 4) == 0 || memcmp(id, "PCSA", 4) == 0 ||
+        memcmp(id, "NPNA", 4) == 0)
     {
         return "USA";
     }
-    else if (memcmp(id, "PCSF", 4) == 0 || memcmp(id, "PCSB", 4) == 0)
+    else if (memcmp(id, "PCSF", 4) == 0 || memcmp(id, "PCSB", 4) == 0 ||
+             memcmp(id, "NPOA", 4) == 0)
     {
         return "EUR";
     }
     else if (memcmp(id, "PCSC", 4) == 0 || memcmp(id, "VCJS", 4) == 0 || 
              memcmp(id, "PCSG", 4) == 0 || memcmp(id, "VLJS", 4) == 0 ||
-             memcmp(id, "VLJM", 4) == 0)
+             memcmp(id, "VLJM", 4) == 0 || memcmp(id, "NPPA", 4) == 0)
     {
         return "JPN";
     }
     else if (memcmp(id, "VCAS", 4) == 0 || memcmp(id, "PCSH", 4) == 0 ||
-             memcmp(id, "VLAS", 4) == 0 || memcmp(id, "PCSD", 4) == 0)
+             memcmp(id, "VLAS", 4) == 0 || memcmp(id, "PCSD", 4) == 0 ||
+             memcmp(id, "NPQA", 4) == 0)
     {
         return "ASA";
     }
@@ -434,9 +437,10 @@ int main(int argc, char* argv[])
         meta_offset += 2 * sizeof(uint32_t) + size;
     }
 
-    int psx = content_type == 6;
-    int psp = content_type == 7 || content_type == 0xf; // PSX, PSP, PSPMini
-    int dlc = content_type == 0x16; // APP
+    int psx = content_type == 6; // PSX
+    int psp = content_type == 7 || content_type == 0xf; // PSP, PSPMini
+    int dlc = content_type == 0x16; // Vita APP
+    int psm = content_type == 0x18; // Vita PSM
 
     aes128_key ps3_key;
     uint8_t main_key[16];
@@ -475,23 +479,36 @@ int main(int argc, char* argv[])
     const char* id = content + 7;
     const char* id2 = id + 13;
 
-    // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
-    uint8_t rif[512];
+    // first 512 - for vita games - https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
+    // 1024 is used for PSM
+    uint8_t rif[1024];
+    uint32_t rif_size = 0;
 
     if (psp || psx)
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, title);
+        id = (char*)pkg_header + 0x37;
     }
     else
     {
-        parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
+        if (psm)
+        {
+            memcpy(content, pkg_header + 0x30, 0x30);
+            rif_size = 1024;
+        }
+        else
+        {
+            parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
+            rif_size = 512;
+        }
 
         if (!patch && zrif_arg != NULL)
         {
-            zrif_decode(zrif_arg, rif);
-            if (strncmp((char*)rif + 0x10, content, 0x30) != 0)
+            zrif_decode(zrif_arg, rif, rif_size);
+            const char* rif_contentid = (char*)rif + (psm ? 0x50 : 0x10);
+            if (strncmp(rif_contentid, content, 0x30) != 0)
             {
-                fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif + 0x10, content);
+                fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
             }
         }
     }
@@ -501,14 +518,12 @@ int main(int argc, char* argv[])
     char root[1024];
     if (psp)
     {
-        id = (char*)pkg_header + 0x37;
         const char* type_str = content_type == 7 ? "PSP" : "PSPMini";
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
         printf("[*] unpacking %s\n", type_str);
     }
     else if (psx)
     {
-        id = (char*)pkg_header + 0x37;
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
         printf("[*] unpacking PSX\n");
     }
@@ -521,6 +536,11 @@ int main(int argc, char* argv[])
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
         printf("[*] unpacking PATCH\n");
+    }
+    else if (psm)
+    {
+        snprintf(root, sizeof(root), "%.9s [%s]%s", id, get_region(id), ext);
+        printf("[*] unpacking PSM\n");
     }
     else
     {
@@ -576,6 +596,16 @@ int main(int argc, char* argv[])
     else if (patch)
     {
         sys_vstrncat(root, sizeof(root), "patch");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/");
+    }
+    else if (psm)
+    {
+        sys_vstrncat(root, sizeof(root), "psm");
         out_add_folder(root);
 
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
@@ -644,7 +674,17 @@ int main(int argc, char* argv[])
 
         if (flags == 4 || flags == 18)
         {
-            if (!psx)
+            if (psm)
+            {
+                // skip "content/" prefix
+                char* slash = strchr(name, '/');
+                if (slash != NULL)
+                {
+                    snprintf(path, sizeof(path), "%sRO/%s/", root, name + 8);
+                    out_add_folder(path);
+                }
+            }
+            else if (!psx)
             {
                 snprintf(path, sizeof(path), "%s%s/", root, name);
                 out_add_folder(path);
@@ -674,6 +714,11 @@ int main(int argc, char* argv[])
                     continue;
                 }
             }
+            else if (psm)
+            {
+                // skip "content/" prefix
+                snprintf(path, sizeof(path), "%sRO/%s", root, name + 8);
+            }
             else
             {
                 snprintf(path, sizeof(path), "%s%s", root, name);
@@ -702,9 +747,9 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (!psp && !psx)
+    if (!psp && !psx && !psm)
     {
-        printf("[*] creating head.bin\n");
+        printf("[*] creating sce_sys/package/head.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/head.bin", root);
 
         out_begin_file(path);
@@ -722,9 +767,9 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if (!psp && !psx)
+    if (!psp && !psx && !psm)
     {
-        printf("[*] creating tail.bin\n");
+        printf("[*] creating sce_sys/package/tail.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/tail.bin", root);
 
         out_begin_file(path);
@@ -740,9 +785,9 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if (!psp && !psx)
+    if (!psp && !psx && !psm)
     {
-        printf("[*] creating stat.bin\n");
+        printf("[*] creating sce_sys/package/stat.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
@@ -753,17 +798,62 @@ int main(int argc, char* argv[])
 
     if (!psp && !psx && !patch && zrif_arg != NULL)
     {
-        printf("[*] creating work.bin\n");
-        snprintf(path, sizeof(path), "%ssce_sys/package/work.bin", root);
+        if (psm)
+        {
+            printf("[*] creating RO/License\n");
+            snprintf(path, sizeof(path), "%sRO/License", root);
+            out_add_folder(path);
+
+            printf("[*] creating RO/License/FAKE.rif\n");
+            snprintf(path, sizeof(path), "%sRO/License/FAKE.rif", root);
+        }
+        else
+        {
+            printf("[*] creating sce_sys/package/work.bin\n");
+            snprintf(path, sizeof(path), "%ssce_sys/package/work.bin", root);
+        }
 
         out_begin_file(path);
-        out_write(rif, sizeof(rif));
+        out_write(rif, rif_size);
+        out_end_file();
+    }
+
+    if (psm)
+    {
+        printf("[*] creating RW\n");
+        snprintf(path, sizeof(path), "%sRW", root);
+        out_add_folder(path);
+
+        printf("[*] creating RW/Documents\n");
+        snprintf(path, sizeof(path), "%sRW/Documents", root);
+        out_add_folder(path);
+
+        printf("[*] creating RW/Temp\n");
+        snprintf(path, sizeof(path), "%sRW/Temp", root);
+        out_add_folder(path);
+
+        printf("[*] creating RW/System\n");
+        snprintf(path, sizeof(path), "%sRW/System", root);
+        out_add_folder(path);
+
+        printf("[*] creating RW/System/content_id\n");
+        snprintf(path, sizeof(path), "%sRW/System/content_id", root);
+        out_begin_file(path);
+        out_write(pkg_header + 0x30, 0x30);
+        out_end_file();
+
+        printf("[*] creating RW/System/pm.dat\n");
+        snprintf(path, sizeof(path), "%sRW/System/pm.dat", root);
+
+        uint8_t pm[1 << 16] = { 0 };
+        out_begin_file(path);
+        out_write(pm, sizeof(pm));
         out_end_file();
     }
 
     out_end();
 
-    if (!psp && !psx && !dlc)
+    if (!psp && !psx && !dlc && !psm)
     {
         printf("[*] minimum fw version required: %s\n", min_version);
     }
