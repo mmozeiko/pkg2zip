@@ -529,7 +529,7 @@ int main(int argc, char* argv[])
         }
         else // Vita APP, DLC or PATCH
         {
-            int patch;
+            int patch = 0;
             parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
             rif_size = 512;
             
