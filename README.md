@@ -2,11 +2,16 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package.
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supports also PSX pkg files for use with [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline).
 
 Optionally saves [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm) license into work.bin file. You must provide license key.
 
-DLC support available when VitaShell will include [this pull request](https://github.com/TheOfficialFloW/VitaShell/pull/310).
+# Requirements
+
+* [Henkaku](https://henkaku.xyz/) / [Enso](https://enso.henkaku.xyz/)
+* [NoNpDrm](https://github.com/TheOfficialFloW/NoNpDrm)
+* to use DLC pkg files, [VitaShell](https://github.com/TheOfficialFloW/VitaShell) **v1.76** or newer required
+* [Adrenaline](https://github.com/TheOfficialFloW/Adrenaline) for PSX titles
 
 # Features
 
@@ -14,11 +19,12 @@ DLC support available when VitaShell will include [this pull request](https://gi
 * **small**, has no external library dependencies and uses very minimal dynamic memory allocations.
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI](https://en.wikipedia.org/wiki/AES_instruction_set) and [SSSE3](https://en.wikipedia.org/wiki/SSSE3) instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
-* **DLC** and **PATCH** pkg support.
+* **DLC** and **PATCH** pkg unpacking.
+* **PSX** pkg unpacking.
 
 Limitations:
 
-* currently no PSM pkg files are supported.
+* currently no PSM, PSP or PSP Mini pkg files are supported.
 
 # Usage
 
@@ -33,6 +39,8 @@ If you don't have zRIF fake license, but just want to unpack files, then omit la
     pkg2zip package.pkg
 
 Resulting zip file will not include work.bin. This is useful for patch pkg files.
+
+PSX pkg files do not require zRIF argument. It will be ignored.
 
 # Generating zRIF string
 

@@ -333,7 +333,8 @@ int main(int argc, char* argv[])
         meta_offset += 2 * sizeof(uint32_t) + size;
     }
 
-    int psp = content_type == 6 || content_type == 7 || content_type == 0xf; // PSX, PSP, PSPMini
+    int psx = content_type == 6;
+    int psp = content_type == 7 || content_type == 0xf; // PSX, PSP, PSPMini
     int dlc = content_type == 0x16; // APP
 
     aes128_key ps3_key;
@@ -376,7 +377,7 @@ int main(int argc, char* argv[])
     // https://github.com/TheOfficialFloW/NoNpDrm/blob/v1.1/src/main.c#L42
     uint8_t rif[512];
 
-    if (psp)
+    if (psp || psx)
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, title);
     }
@@ -397,9 +398,16 @@ int main(int argc, char* argv[])
     char path[1024];
     if (psp)
     {
-        const char* type_str = content_type == 6 ? "PSX" : content_type == 7 ? "PSP" : "PSPMini";
-        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, pkg_header + 0x37, type_str);
+        id = (char*)pkg_header + 0x37;
+        const char* type_str = content_type == 7 ? "PSP" : "PSPMini";
+        snprintf(path, sizeof(path), "%s [%.9s] [%s].zip", title, id, type_str);
         printf("[*] unpacking %s\n", type_str);
+    }
+    else if (psx)
+    {
+        id = (char*)pkg_header + 0x37;
+        snprintf(path, sizeof(path), "%s [%.9s] [PSX].zip", title, id);
+        printf("[*] unpacking PSX\n");
     }
     else if (dlc)
     {
@@ -422,8 +430,27 @@ int main(int argc, char* argv[])
     zip z;
     zip_create(&z, path);
 
+    char root[64];
+
     if (psp)
     {
+        root[0] = 0;
+    }
+    else if (psx)
+    {
+        snprintf(path, sizeof(path), "pspemu/");
+        zip_add_folder(&z, path);
+
+        snprintf(path, sizeof(path), "pspemu/PSP/");
+        zip_add_folder(&z, path);
+
+        snprintf(path, sizeof(path), "pspemu/PSP/GAME/");
+        zip_add_folder(&z, path);
+
+        snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/", id);
+        zip_add_folder(&z, path);
+
+        snprintf(root, sizeof(root), "pspemu/PSP/GAME/%.9s", id);
     }
     else if (dlc)
     {
@@ -435,6 +462,8 @@ int main(int argc, char* argv[])
 
         snprintf(path, sizeof(path), "addcont/%.9s/%s/", id, id2);
         zip_add_folder(&z, path);
+
+        snprintf(root, sizeof(root), "addcont/%.9s/%s", id, id2);
     }
     else if (patch)
     {
@@ -443,6 +472,8 @@ int main(int argc, char* argv[])
 
         snprintf(path, sizeof(path), "patch/%.9s/", id);
         zip_add_folder(&z, path);
+
+        snprintf(root, sizeof(root), "patch/%.9s", id);
     }
     else
     {
@@ -451,24 +482,8 @@ int main(int argc, char* argv[])
 
         snprintf(path, sizeof(path), "app/%.9s/", id);
         zip_add_folder(&z, path);
-    }
 
-    char root[64];
-    if (psp)
-    {
-        root[0] = 0;
-    }
-    else if (dlc)
-    {
-        snprintf(root, sizeof(root), "addcont/%.9s/%s", id, id2);
-    }
-    else if (patch)
-    {
-        snprintf(root, sizeof(root), "patch/%.9s", id);
-    }
-    else
-    {
-        snprintf(root, sizeof(root), "app/%.9s", id);
+        snprintf(root, sizeof(root), "app/%.9s/", id);
     }
 
     printf("[*] decrypting...\n");
@@ -501,7 +516,15 @@ int main(int argc, char* argv[])
             fatal("ERROR: pkg file contains file with very long name\n");
         }
 
-        const aes128_key* item_key = psp && psp_type == 0x90 ? &key : &ps3_key;
+        const aes128_key* item_key;
+        if (psp || psx)
+        {
+            item_key = psp_type == 0x90 ? &key : &ps3_key;
+        }
+        else
+        {
+            item_key = &key;
+        }
 
         char name[ZIP_MAX_FILENAME];
         sys_read(pkg, enc_offset + name_offset, name, name_size);
@@ -512,20 +535,40 @@ int main(int argc, char* argv[])
 
         if (flags == 4 || flags == 18)
         {
-            snprintf(path, sizeof(path), "%s/%s/", root, name);
-
-            zip_add_folder(&z, path);
+            if (!psx)
+            {
+                snprintf(path, sizeof(path), "%s/%s/", root, name);
+                zip_add_folder(&z, path);
+            }
         }
         else
         {
             int decrypt = 1;
-            if (!psp && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if (!psp && !psx && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
             }
 
-            snprintf(path, sizeof(path), "%s/%s", root, name);
+            if (psx)
+            {
+                if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "%s/DOCUMENT.DAT", root);
+                }
+                else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "%s/EBOOT.PBP", root);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                snprintf(path, sizeof(path), "%s/%s", root, name);
+            }
 
             uint64_t offset = data_offset;
 
@@ -550,7 +593,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (!psp)
+    if (!psp && !psx)
     {
         printf("[*] creating head.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
@@ -570,7 +613,7 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    if (!psp)
+    if (!psp && !psx)
     {
         printf("[*] creating tail.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
@@ -588,7 +631,7 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    if (!psp)
+    if (!psp && !psx)
     {
         printf("[*] creating stat.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
@@ -599,7 +642,7 @@ int main(int argc, char* argv[])
         zip_end_file(&z);
     }
 
-    if (!psp && !patch && argc == 3)
+    if (!psp && !psx && !patch && argc == 3)
     {
         printf("[*] creating work.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
@@ -611,7 +654,7 @@ int main(int argc, char* argv[])
 
     zip_close(&z);
 
-    if (!psp && !dlc)
+    if (!psp && !psx && !dlc)
     {
         printf("[*] minimum fw version required: %s\n", min_version);
     }
