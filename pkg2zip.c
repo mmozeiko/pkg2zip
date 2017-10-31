@@ -105,7 +105,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
     }
     *title = 0;
 
-    if (content_index > 0 && content)
+    if (content_index >= 0 && content)
     {
 
         value = (char*)sfo + values + get32le(sfo + content_index * 16 + 20 + 12);
@@ -116,7 +116,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
         *content = 0;
     }
 
-    if (category_index > 0 && patch)
+    if (category_index >= 0 && patch)
     {
         char* category = value = (char*)sfo + values + get32le(sfo + category_index * 16 + 20 + 12);
         while (*value++)
@@ -130,7 +130,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
         }
     }
 
-    if (minver_index > 0 && min_version)
+    if (minver_index >= 0 && min_version)
     {
         value = (char*)sfo + values + get32le(sfo + minver_index * 16 + 20 + 12);
         if (*value == '0')
@@ -151,7 +151,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
         }
     }
 
-    if (pkgver_index > 0 && pkg_version)
+    if (pkgver_index >= 0 && pkg_version)
     {
         value = (char*)sfo + values + get32le(sfo + pkgver_index * 16 + 20 + 12);
         if (*value == '0')
@@ -731,7 +731,7 @@ int main(int argc, char* argv[])
                     out_add_folder(path);
                 }
             }
-            else if (type == PKG_TYPE_PSX)
+            else if (type != PKG_TYPE_PSX)
             {
                 snprintf(path, sizeof(path), "%s%s/", root, name);
                 out_add_folder(path);
@@ -742,6 +742,7 @@ int main(int argc, char* argv[])
             int decrypt = 1;
             if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC) && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
+                // TODO: is this really needed?
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
             }
@@ -796,6 +797,13 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
     {
+        if (type == PKG_TYPE_VITA_PATCH)
+        {
+            printf("[*] creating sce_sys/package\n");
+            snprintf(path, sizeof(path), "%ssce_sys/package", root);
+            out_add_folder(path);
+        }
+
         printf("[*] creating sce_sys/package/head.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/head.bin", root);
 
