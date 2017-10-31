@@ -340,6 +340,15 @@ static void out_write(const void* buffer, uint32_t size)
     }
 }
 
+typedef enum {
+    PKG_TYPE_VITA_APP,
+    PKG_TYPE_VITA_DLC,
+    PKG_TYPE_VITA_PATCH,
+    PKG_TYPE_VITA_PSM,
+    PKG_TYPE_PSP,
+    PKG_TYPE_PSX,
+} pkg_type;
+
 int main(int argc, char* argv[])
 {
     printf("pkg2zip v1.5\n");
@@ -437,10 +446,33 @@ int main(int argc, char* argv[])
         meta_offset += 2 * sizeof(uint32_t) + size;
     }
 
-    int psx = content_type == 6; // PSX
-    int psp = content_type == 7 || content_type == 0xf; // PSP, PSPMini
-    int dlc = content_type == 0x16; // Vita APP
-    int psm = content_type == 0x18; // Vita PSM
+    pkg_type type;
+
+    if (content_type == 6)
+    {
+        type = PKG_TYPE_PSX;
+    }
+    else if (content_type == 7 || content_type == 0xf)
+    {
+        // PSP or PSPMini
+        type = PKG_TYPE_PSP;
+    }
+    else if (content_type == 0x15)
+    {
+        type = PKG_TYPE_VITA_APP;
+    }
+    else if (content_type == 0x16)
+    {
+        type = PKG_TYPE_VITA_DLC;
+    }
+    else if (content_type == 0x18)
+    {
+        type = PKG_TYPE_VITA_PSM;
+    }
+    else
+    {
+        fatal("ERROR: unsupported content type 0x%x", content_type);
+    }
 
     aes128_key ps3_key;
     uint8_t main_key[16];
@@ -475,7 +507,6 @@ int main(int argc, char* argv[])
     char title[256];
     char min_version[256];
     char pkg_version[256];
-    int patch = 0;
     const char* id = content + 7;
     const char* id2 = id + 13;
 
@@ -484,28 +515,34 @@ int main(int argc, char* argv[])
     uint8_t rif[1024];
     uint32_t rif_size = 0;
 
-    if (psp || psx)
+    if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, title);
         id = (char*)pkg_header + 0x37;
     }
-    else
+    else // Vita
     {
-        if (psm)
+        if (type == PKG_TYPE_VITA_PSM)
         {
             memcpy(content, pkg_header + 0x30, 0x30);
             rif_size = 1024;
         }
-        else
+        else // Vita APP, DLC or PATCH
         {
+            int patch;
             parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
             rif_size = 512;
+            
+            if (patch && type == PKG_TYPE_VITA_APP)
+            {
+                type = PKG_TYPE_VITA_PATCH;
+            }
         }
 
-        if (!patch && zrif_arg != NULL)
+        if (type != PKG_TYPE_VITA_PATCH && zrif_arg != NULL)
         {
             zrif_decode(zrif_arg, rif, rif_size);
-            const char* rif_contentid = (char*)rif + (psm ? 0x50 : 0x10);
+            const char* rif_contentid = (char*)rif + (type == PKG_TYPE_VITA_PSM ? 0x50 : 0x10);
             if (strncmp(rif_contentid, content, 0x30) != 0)
             {
                 fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
@@ -516,36 +553,41 @@ int main(int argc, char* argv[])
     const char* ext = zipped ? ".zip" : "";
 
     char root[1024];
-    if (psp)
+    if (type == PKG_TYPE_PSP)
     {
         const char* type_str = content_type == 7 ? "PSP" : "PSPMini";
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
         printf("[*] unpacking %s\n", type_str);
     }
-    else if (psx)
+    else if (type == PKG_TYPE_PSX)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
         printf("[*] unpacking PSX\n");
     }
-    else if (dlc)
+    else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
         printf("[*] unpacking DLC\n");
     }
-    else if (patch)
+    else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
         printf("[*] unpacking PATCH\n");
     }
-    else if (psm)
+    else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s]%s", id, get_region(id), ext);
         printf("[*] unpacking PSM\n");
     }
-    else
+    else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
         printf("[*] unpacking APP\n");
+    }
+    else
+    {
+        assert(0);
+        fatal("ERROR: unsupported type");
     }
 
     out_begin(root, zipped);
@@ -561,10 +603,10 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/");
     }
 
-    if (psp)
+    if (type == PKG_TYPE_PSP)
     {
     }
-    else if (psx)
+    else if (type == PKG_TYPE_PSX)
     {
         sys_vstrncat(root, sizeof(root), "pspemu");
         out_add_folder(root);
@@ -580,7 +622,7 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/");
     }
-    else if (dlc)
+    else if (type == PKG_TYPE_VITA_DLC)
     {
         sys_vstrncat(root, sizeof(root), "addcont");
         out_add_folder(root);
@@ -593,7 +635,7 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/");
     }
-    else if (patch)
+    else if (type == PKG_TYPE_VITA_PATCH)
     {
         sys_vstrncat(root, sizeof(root), "patch");
         out_add_folder(root);
@@ -603,7 +645,7 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/");
     }
-    else if (psm)
+    else if (type == PKG_TYPE_VITA_PSM)
     {
         sys_vstrncat(root, sizeof(root), "psm");
         out_add_folder(root);
@@ -613,7 +655,7 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/");
     }
-    else
+    else if (type == PKG_TYPE_VITA_APP)
     {
         sys_vstrncat(root, sizeof(root), "app");
         out_add_folder(root);
@@ -622,6 +664,11 @@ int main(int argc, char* argv[])
         out_add_folder(root);
 
         sys_vstrncat(root, sizeof(root), "/");
+    }
+    else
+    {
+        assert(0);
+        fatal("ERROR: unsupported type");
     }
 
     printf("[*] decrypting...\n");
@@ -656,7 +703,7 @@ int main(int argc, char* argv[])
         }
 
         const aes128_key* item_key;
-        if (psp || psx)
+        if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
         {
             item_key = psp_type == 0x90 ? &key : &ps3_key;
         }
@@ -674,7 +721,7 @@ int main(int argc, char* argv[])
 
         if (flags == 4 || flags == 18)
         {
-            if (psm)
+            if (type == PKG_TYPE_VITA_PSM)
             {
                 // skip "content/" prefix
                 char* slash = strchr(name, '/');
@@ -684,7 +731,7 @@ int main(int argc, char* argv[])
                     out_add_folder(path);
                 }
             }
-            else if (!psx)
+            else if (type == PKG_TYPE_PSX)
             {
                 snprintf(path, sizeof(path), "%s%s/", root, name);
                 out_add_folder(path);
@@ -693,13 +740,13 @@ int main(int argc, char* argv[])
         else
         {
             int decrypt = 1;
-            if (!psp && !psx && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC) && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
             }
 
-            if (psx)
+            if (type == PKG_TYPE_PSX)
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
@@ -714,7 +761,7 @@ int main(int argc, char* argv[])
                     continue;
                 }
             }
-            else if (psm)
+            else if (type == PKG_TYPE_VITA_PSM)
             {
                 // skip "content/" prefix
                 snprintf(path, sizeof(path), "%sRO/%s", root, name + 8);
@@ -747,7 +794,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    if (!psp && !psx && !psm)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
     {
         printf("[*] creating sce_sys/package/head.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/head.bin", root);
@@ -765,10 +812,7 @@ int main(int argc, char* argv[])
             head_offset += size;
         }
         out_end_file();
-    }
 
-    if (!psp && !psx && !psm)
-    {
         printf("[*] creating sce_sys/package/tail.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/tail.bin", root);
 
@@ -783,10 +827,7 @@ int main(int argc, char* argv[])
             tail_offset += size;
         }
         out_end_file();
-    }
 
-    if (!psp && !psx && !psm)
-    {
         printf("[*] creating sce_sys/package/stat.bin\n");
         snprintf(path, sizeof(path), "%ssce_sys/package/stat.bin", root);
 
@@ -796,9 +837,9 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if (!psp && !psx && !patch && zrif_arg != NULL)
+    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM) && zrif_arg != NULL)
     {
-        if (psm)
+        if (type == PKG_TYPE_VITA_PSM)
         {
             printf("[*] creating RO/License\n");
             snprintf(path, sizeof(path), "%sRO/License", root);
@@ -818,7 +859,7 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if (psm)
+    if (type == PKG_TYPE_VITA_PSM)
     {
         printf("[*] creating RW\n");
         snprintf(path, sizeof(path), "%sRW", root);
@@ -853,7 +894,7 @@ int main(int argc, char* argv[])
 
     out_end();
 
-    if (!psp && !psx && !dlc && !psm)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
     {
         printf("[*] minimum fw version required: %s\n", min_version);
     }
