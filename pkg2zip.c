@@ -275,10 +275,6 @@ static void out_begin(const char* name, int zipped)
     {
         zip_create(&out_zip, name);
     }
-    else
-    {
-        sys_mkdir(name);
-    }
     out_zipped = zipped;
 }
 
@@ -600,7 +596,16 @@ int main(int argc, char* argv[])
     else
     {
         printf("[*] output to '%s' folder\n", root);
-        sys_vstrncat(root, sizeof(root), "/");
+        if (type == PKG_TYPE_PSP)
+        {
+            // until PSP support is done
+            sys_mkdir(root);
+            sys_vstrncat(root, sizeof(root), "/");
+        }
+        else
+        {
+            root[0] = 0;
+        }
     }
 
     if (type == PKG_TYPE_PSP)
