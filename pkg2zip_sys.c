@@ -154,7 +154,7 @@ void sys_close(sys_file file)
 void sys_read(sys_file file, uint64_t offset, void* buffer, uint32_t size)
 {
     ssize_t read = pread((int)(intptr_t)file, buffer, size, offset);
-    if (read != size)
+    if (read < 0 || read != (ssize_t)size)
     {
         fatal("ERROR: failed to read %u bytes from file\n", size);
     }
@@ -163,7 +163,7 @@ void sys_read(sys_file file, uint64_t offset, void* buffer, uint32_t size)
 void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size)
 {
     ssize_t wrote = pwrite((int)(intptr_t)file, buffer, size, offset);
-    if (wrote != size)
+    if (wrote < 0 || wrote != (ssize_t)size)
     {
         fatal("ERROR: failed to read %u bytes from file\n", size);
     }
