@@ -347,7 +347,7 @@ typedef enum {
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.5\n");
+    printf("pkg2zip v1.6\n");
 
     int zipped = 1;
     const char* pkg_arg = NULL;
