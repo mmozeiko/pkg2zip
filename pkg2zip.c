@@ -679,6 +679,8 @@ int main(int argc, char* argv[])
     printf("[*] decrypting...\n");
     char path[1024];
 
+    int sce_sys_package_created = 0;
+
     for (uint32_t item_index = 0; item_index < item_count; item_index++)
     {
         uint8_t item[32];
@@ -732,22 +734,34 @@ int main(int argc, char* argv[])
                 char* slash = strchr(name, '/');
                 if (slash != NULL)
                 {
-                    snprintf(path, sizeof(path), "%sRO/%s/", root, name + 8);
+                    snprintf(path, sizeof(path), "%sRO/%s", root, name + 8);
                     out_add_folder(path);
                 }
             }
             else if (type != PKG_TYPE_PSX)
             {
-                snprintf(path, sizeof(path), "%s%s/", root, name);
+                snprintf(path, sizeof(path), "%s%s", root, name);
                 out_add_folder(path);
+
+                if (strcmp("sce_sys/package", name) == 0)
+                {
+                    sce_sys_package_created = 1;
+                }
             }
         }
         else
         {
             int decrypt = 1;
-            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC) && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH) && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
                 // TODO: is this really needed?
+                if (!sce_sys_package_created)
+                {
+                    snprintf(path, sizeof(path), "%ssce_sys/package", root);
+                    out_add_folder(path);
+
+                    sce_sys_package_created = 1;
+                }
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
             }
@@ -802,7 +816,7 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
     {
-        if (type == PKG_TYPE_VITA_PATCH)
+        if (!sce_sys_package_created)
         {
             printf("[*] creating sce_sys/package\n");
             snprintf(path, sizeof(path), "%ssce_sys/package", root);
