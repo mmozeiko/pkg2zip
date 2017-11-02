@@ -203,7 +203,7 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
         if (pkg_size < enc_offset + name_offset + name_size ||
             pkg_size < enc_offset + data_offset + data_size)
         {
-            fatal("ERROR: pkg file is too short, possible corrupted\n");
+            fatal("ERROR: pkg file is too short, possibly corrupted\n");
         }
 
         const aes128_key* item_key = psp_type == 0x90 ? key : ps3_key;
@@ -462,7 +462,7 @@ int main(int argc, char* argv[])
     {
         type = PKG_TYPE_VITA_DLC;
     }
-    else if (content_type == 0x18)
+    else if (content_type == 0x18 || content_type == 0x1d)
     {
         type = PKG_TYPE_VITA_PSM;
     }
@@ -702,7 +702,7 @@ int main(int argc, char* argv[])
         if (pkg_size < enc_offset + name_offset + name_size ||
             pkg_size < enc_offset + data_offset + data_size)
         {
-            fatal("ERROR: pkg file is too short, possible corrupted\n");
+            fatal("ERROR: pkg file is too short, possibly corrupted\n");
         }
 
         if (name_size >= ZIP_MAX_FILENAME)
