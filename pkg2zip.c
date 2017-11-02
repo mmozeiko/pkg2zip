@@ -12,7 +12,7 @@
 #define PKG_HEADER_SIZE 192
 #define PKG_HEADER_EXT_SIZE 64
 
-// http://vitadevwiki.com/vita/Packages_(.PKG)#Keys
+// https://wiki.henkaku.xyz/vita/Packages#AES_Keys
 static const uint8_t pkg_ps3_key[] = { 0x2e, 0x7b, 0x71, 0xd7, 0xc9, 0xc9, 0xa1, 0x4e, 0xa3, 0x22, 0x1f, 0x18, 0x88, 0x28, 0xb8, 0xf8 };
 static const uint8_t pkg_psp_key[] = { 0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d, 0x2c, 0x33, 0x81, 0x8d, 0x70, 0x9b, 0x60, 0xe6, 0x2b };
 static const uint8_t pkg_vita_2[] = { 0xe3, 0x1a, 0x70, 0xc9, 0xce, 0x1d, 0xd7, 0x2b, 0xf3, 0xc0, 0x62, 0x29, 0x63, 0xf2, 0xec, 0xcb };
@@ -444,13 +444,14 @@ int main(int argc, char* argv[])
 
     pkg_type type;
 
+    // http://www.psdevwiki.com/ps3/PKG_files
     if (content_type == 6)
     {
         type = PKG_TYPE_PSX;
     }
-    else if (content_type == 7 || content_type == 0xf)
+    else if (content_type == 7 || content_type == 0xe || content_type == 0xf || content_type == 0x10)
     {
-        // PSP or PSPMini
+        // PSP / PSP-Go / PSP-Mini / PSP-NeoGeo
         type = PKG_TYPE_PSP;
     }
     else if (content_type == 0x15)
@@ -551,7 +552,7 @@ int main(int argc, char* argv[])
     char root[1024];
     if (type == PKG_TYPE_PSP)
     {
-        const char* type_str = content_type == 7 ? "PSP" : "PSPMini";
+        const char* type_str = content_type == 7 ? "PSP" : content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
         printf("[*] unpacking %s\n", type_str);
     }
