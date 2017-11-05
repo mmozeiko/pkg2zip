@@ -297,23 +297,23 @@ uint32_t crc32_done_x86(crc32_ctx* ctx)
 
     a = _mm_clmulepi64_si128(xmm0, fold, 0x10);
     b = _mm_clmulepi64_si128(xmm0, fold, 0x01);
-    xmm1 = _mm_xor_si128(xmm1, a);
-    xmm1 = _mm_xor_si128(xmm1, b);
+    t = _mm_xor_si128(xmm1, a);
+    t = _mm_xor_si128(t, b);
 
-    a = _mm_clmulepi64_si128(xmm1, fold, 0x10);
-    b = _mm_clmulepi64_si128(xmm1, fold, 0x01);
-    xmm2 = _mm_xor_si128(xmm2, a);
-    xmm2 = _mm_xor_si128(xmm2, b);
+    a = _mm_clmulepi64_si128(t, fold, 0x10);
+    b = _mm_clmulepi64_si128(t, fold, 0x01);
+    t = _mm_xor_si128(xmm2, a);
+    t = _mm_xor_si128(t, b);
 
-    a = _mm_clmulepi64_si128(xmm2, fold, 0x10);
-    b = _mm_clmulepi64_si128(xmm2, fold, 0x01);
-    xmm3 = _mm_xor_si128(xmm3, a);
-    xmm3 = _mm_xor_si128(xmm3, b);
+    a = _mm_clmulepi64_si128(t, fold, 0x10);
+    b = _mm_clmulepi64_si128(t, fold, 0x01);
+    t = _mm_xor_si128(xmm3, a);
+    t = _mm_xor_si128(t, b);
 
     fold = _mm_setr_epi32(0xccaa009e, 0x00000000, 0x63cd6124, 0x00000001);
 
-    a = _mm_clmulepi64_si128(xmm3, fold, 0);
-    b = _mm_srli_si128(xmm3, 8);
+    a = _mm_clmulepi64_si128(t, fold, 0);
+    b = _mm_srli_si128(t, 8);
     a = _mm_xor_si128(a, b);
 
     b = _mm_slli_si128(a, 4);
