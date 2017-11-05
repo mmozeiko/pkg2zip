@@ -20,7 +20,7 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **small**, has no external library dependencies and uses very minimal dynamic memory allocations.
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
-* **DLC**, **PATCH** and **PSM** pkg unpacking.
+* **VITA DLCs**, **VITA PATCHES** and **PSM** pkg unpacking.
 * **PSX** pkg unpacking.
 
 Limitations:
@@ -50,13 +50,13 @@ PSX pkg files do not require zRIF argument. It will be ignored.
 
 # Generating zRIF string
 
-If you have working main.bin file you can create zRIF string with `rif2zrif.py` python script:
+If you have working NoNpDRM license file(work.bin or 6488b73b912a753a492e2714e9b38bc7.rif) you can create zRIF string with `rif2zrif.py` python script:
 
-    $ python rif2zrif.py path/to/main.bin
+    $ python rif2zrif.py path/to/work.bin
 
 It will print zRIF string to stdout.
 
-To generate main.bin from zRIF string use `zrif2rif.py` script:
+To generate work.bin from zRIF string use `zrif2rif.py` script:
 
     $ python zrif2rif.py zRIF work.bin
 
@@ -80,9 +80,8 @@ On Windows you can build either with MinGW (get [MinGW-w64][]) or [Visual Studio
 
 # Alternatives
 
-* https://github.com/RikuKH3/unpkg_vita
-* https://github.com/St4rk/PkgDecrypt
 * https://github.com/weaknespase/PkgDecrypt
+* https://github.com/RikuKH3/unpkg_vita
 
 # License
 
