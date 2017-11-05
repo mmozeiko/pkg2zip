@@ -226,7 +226,7 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
             }
 
             sys_read(pkg, enc_offset + data_offset, sfo, (uint32_t)data_size);
-            aes128_ctr_xor(item_key, iv, data_offset / 16, sfo, data_size);
+            aes128_ctr_xor(item_key, iv, data_offset / 16, sfo, (uint32_t)data_size);
 
             parse_sfo_content(sfo, (uint32_t)data_size, NULL, title, NULL, NULL, NULL);
             return;
