@@ -1,5 +1,7 @@
 #include "pkg2zip_aes.h"
 #include "pkg2zip_zip.h"
+#include "pkg2zip_out.h"
+#include "pkg2zip_psp.h"
 #include "pkg2zip_utils.h"
 #include "pkg2zip_zrif.h"
 
@@ -264,78 +266,6 @@ static const char* get_region(const char* id)
     }
 }
 
-static zip out_zip;
-static int out_zipped;
-static sys_file out_file;
-static uint64_t out_file_offset;
-
-static void out_begin(const char* name, int zipped)
-{
-    if (zipped)
-    {
-        zip_create(&out_zip, name);
-    }
-    out_zipped = zipped;
-}
-
-static void out_end(void)
-{
-    if (out_zipped)
-    {
-        zip_close(&out_zip);
-    }
-}
-
-static void out_add_folder(const char* path)
-{
-    if (out_zipped)
-    {
-        zip_add_folder(&out_zip, path);
-    }
-    else
-    {
-        sys_mkdir(path);
-    }
-}
-
-static void out_begin_file(const char* name)
-{
-    if (out_zipped)
-    {
-        zip_begin_file(&out_zip, name);
-    }
-    else
-    {
-        out_file = sys_create(name);
-        out_file_offset = 0;
-    }
-}
-
-static void out_end_file(void)
-{
-    if (out_zipped)
-    {
-        zip_end_file(&out_zip);
-    }
-    else
-    {
-        sys_close(out_file);
-    }
-}
-
-static void out_write(const void* buffer, uint32_t size)
-{
-    if (out_zipped)
-    {
-        zip_write_file(&out_zip, buffer, size);
-    }
-    else
-    {
-        sys_write(out_file, out_file_offset, buffer, size);
-        out_file_offset += size;
-    }
-}
-
 typedef enum {
     PKG_TYPE_VITA_APP,
     PKG_TYPE_VITA_DLC,
@@ -347,7 +277,7 @@ typedef enum {
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.7\n");
+    printf("pkg2zip v1.8\n");
 
     int zipped = 1;
     const char* pkg_arg = NULL;
@@ -587,30 +517,21 @@ int main(int argc, char* argv[])
         fatal("ERROR: unsupported type");
     }
 
-    out_begin(root, zipped);
-
     if (zipped)
     {
         printf("[*] creating '%s' archive\n", root);
-        root[0] = 0;
     }
-    else
-    {
-        printf("[*] output to '%s' folder\n", root);
-        if (type == PKG_TYPE_PSP)
-        {
-            // until PSP support is done
-            sys_mkdir(root);
-            sys_vstrncat(root, sizeof(root), "/");
-        }
-        else
-        {
-            root[0] = 0;
-        }
-    }
+
+    out_begin(root, zipped);
+    root[0] = 0;
 
     if (type == PKG_TYPE_PSP)
     {
+        sys_vstrncat(root, sizeof(root), "pspemu");
+        out_add_folder(root);
+
+        sys_vstrncat(root, sizeof(root), "/ISO");
+        out_add_folder(root);
     }
     else if (type == PKG_TYPE_PSX)
     {
@@ -625,8 +546,6 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/");
     }
     else if (type == PKG_TYPE_VITA_DLC)
     {
@@ -638,8 +557,6 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/%s", id2);
         out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/");
     }
     else if (type == PKG_TYPE_VITA_PATCH)
     {
@@ -648,8 +565,6 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/");
     }
     else if (type == PKG_TYPE_VITA_PSM)
     {
@@ -658,8 +573,6 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/");
     }
     else if (type == PKG_TYPE_VITA_APP)
     {
@@ -668,8 +581,6 @@ int main(int argc, char* argv[])
 
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/");
     }
     else
     {
@@ -735,13 +646,13 @@ int main(int argc, char* argv[])
                 char* slash = strchr(name, '/');
                 if (slash != NULL)
                 {
-                    snprintf(path, sizeof(path), "%sRO/%s", root, name + 8);
+                    snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
                     out_add_folder(path);
                 }
             }
-            else if (type != PKG_TYPE_PSX)
+            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
             {
-                snprintf(path, sizeof(path), "%s%s", root, name);
+                snprintf(path, sizeof(path), "%s/%s", root, name);
                 out_add_folder(path);
 
                 if (strcmp("sce_sys/package", name) == 0)
@@ -758,7 +669,7 @@ int main(int argc, char* argv[])
                 // TODO: is this really needed?
                 if (!sce_sys_package_created)
                 {
-                    snprintf(path, sizeof(path), "%ssce_sys/package", root);
+                    snprintf(path, sizeof(path), "%s/sce_sys/package", root);
                     out_add_folder(path);
 
                     sce_sys_package_created = 1;
@@ -771,25 +682,34 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%sDOCUMENT.DAT", root);
+                    snprintf(path, sizeof(path), "%s/DOCUMENT.DAT", root);
                 }
                 else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%sEBOOT.PBP", root);
+                    snprintf(path, sizeof(path), "%s/EBOOT.PBP", root);
                 }
                 else
                 {
                     continue;
                 }
             }
+            else if (type == PKG_TYPE_PSP)
+            {
+                if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "%s/%s [%.9s].iso", root, title, id);
+                    unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                }
+                continue;
+            }
             else if (type == PKG_TYPE_VITA_PSM)
             {
                 // skip "content/" prefix
-                snprintf(path, sizeof(path), "%sRO/%s", root, name + 8);
+                snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
             }
             else
             {
-                snprintf(path, sizeof(path), "%s%s", root, name);
+                snprintf(path, sizeof(path), "%s/%s", root, name);
             }
 
             uint64_t offset = data_offset;
@@ -810,7 +730,6 @@ int main(int argc, char* argv[])
                 offset += size;
                 data_size -= size;
             }
-
             out_end_file();
         }
     }
@@ -820,12 +739,12 @@ int main(int argc, char* argv[])
         if (!sce_sys_package_created)
         {
             printf("[*] creating sce_sys/package\n");
-            snprintf(path, sizeof(path), "%ssce_sys/package", root);
+            snprintf(path, sizeof(path), "%s/sce_sys/package", root);
             out_add_folder(path);
         }
 
         printf("[*] creating sce_sys/package/head.bin\n");
-        snprintf(path, sizeof(path), "%ssce_sys/package/head.bin", root);
+        snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
 
         out_begin_file(path);
         uint64_t head_size = enc_offset + items_size;
@@ -842,7 +761,7 @@ int main(int argc, char* argv[])
         out_end_file();
 
         printf("[*] creating sce_sys/package/tail.bin\n");
-        snprintf(path, sizeof(path), "%ssce_sys/package/tail.bin", root);
+        snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
         out_begin_file(path);
         uint64_t tail_offset = enc_offset + enc_size;
@@ -857,7 +776,7 @@ int main(int argc, char* argv[])
         out_end_file();
 
         printf("[*] creating sce_sys/package/stat.bin\n");
-        snprintf(path, sizeof(path), "%ssce_sys/package/stat.bin", root);
+        snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
         out_begin_file(path);
@@ -870,16 +789,16 @@ int main(int argc, char* argv[])
         if (type == PKG_TYPE_VITA_PSM)
         {
             printf("[*] creating RO/License\n");
-            snprintf(path, sizeof(path), "%sRO/License", root);
+            snprintf(path, sizeof(path), "%s/RO/License", root);
             out_add_folder(path);
 
             printf("[*] creating RO/License/FAKE.rif\n");
-            snprintf(path, sizeof(path), "%sRO/License/FAKE.rif", root);
+            snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
         }
         else
         {
             printf("[*] creating sce_sys/package/work.bin\n");
-            snprintf(path, sizeof(path), "%ssce_sys/package/work.bin", root);
+            snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
         }
 
         out_begin_file(path);
@@ -890,29 +809,29 @@ int main(int argc, char* argv[])
     if (type == PKG_TYPE_VITA_PSM)
     {
         printf("[*] creating RW\n");
-        snprintf(path, sizeof(path), "%sRW", root);
+        snprintf(path, sizeof(path), "%s/RW", root);
         out_add_folder(path);
 
         printf("[*] creating RW/Documents\n");
-        snprintf(path, sizeof(path), "%sRW/Documents", root);
+        snprintf(path, sizeof(path), "%s/RW/Documents", root);
         out_add_folder(path);
 
         printf("[*] creating RW/Temp\n");
-        snprintf(path, sizeof(path), "%sRW/Temp", root);
+        snprintf(path, sizeof(path), "%s/RW/Temp", root);
         out_add_folder(path);
 
         printf("[*] creating RW/System\n");
-        snprintf(path, sizeof(path), "%sRW/System", root);
+        snprintf(path, sizeof(path), "%s/RW/System", root);
         out_add_folder(path);
 
         printf("[*] creating RW/System/content_id\n");
-        snprintf(path, sizeof(path), "%sRW/System/content_id", root);
+        snprintf(path, sizeof(path), "%s/RW/System/content_id", root);
         out_begin_file(path);
         out_write(pkg_header + 0x30, 0x30);
         out_end_file();
 
         printf("[*] creating RW/System/pm.dat\n");
-        snprintf(path, sizeof(path), "%sRW/System/pm.dat", root);
+        snprintf(path, sizeof(path), "%s/RW/System/pm.dat", root);
 
         uint8_t pm[1 << 16] = { 0 };
         out_begin_file(path);
