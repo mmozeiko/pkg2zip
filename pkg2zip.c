@@ -23,7 +23,7 @@ static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 
 
 // http://vitadevwiki.com/vita/System_File_Object_(SFO)_(PSF)#Internal_Structure
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
-static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch, char* title, char* content, char* min_version, char* pkg_version)
+static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, char* category, char* title, char* content, char* min_version, char* pkg_version)
 {
 
     if (get32le(sfo) != 0x46535000)
@@ -109,7 +109,6 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
 
     if (content_index >= 0 && content)
     {
-
         value = (char*)sfo + values + get32le(sfo + content_index * 16 + 20 + 12);
         while (*value)
         {
@@ -118,19 +117,15 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
         *content = 0;
     }
 
-    if (category_index >= 0 && patch)
+    if (category_index >= 0)
     {
-        char* category = value = (char*)sfo + values + get32le(sfo + category_index * 16 + 20 + 12);
-        while (*value++)
+        value = (char*)sfo + values + get32le(sfo + category_index * 16 + 20 + 12);
+        while (*value)
         {
-        }
-        *value = 0;
-
-        if (strcmp(category, "gp") == 0)
-        {
-            *patch = 1;
+            *category++ = *value++;
         }
     }
+    *category = 0;
 
     if (minver_index >= 0 && min_version)
     {
@@ -168,7 +163,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, int* patch,
     }
 }
 
-static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, int* patch, char* title, char* content, char* min_version, char* pkg_version)
+static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* category, char* title, char* content, char* min_version, char* pkg_version)
 {
     uint8_t sfo[16 * 1024];
     if (sfo_size < 16)
@@ -181,10 +176,10 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, int* p
     }
     sys_read(f, sfo_offset, sfo, sfo_size);
 
-    parse_sfo_content(sfo, sfo_size, patch, title, content, min_version, pkg_version);
+    parse_sfo_content(sfo, sfo_size, category, title, content, min_version, pkg_version);
 }
 
-static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const uint8_t* iv, sys_file pkg, uint64_t pkg_size, uint64_t enc_offset, uint64_t items_offset, uint32_t item_count, char* title)
+static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const uint8_t* iv, sys_file pkg, uint64_t pkg_size, uint64_t enc_offset, uint64_t items_offset, uint32_t item_count, char* category, char* title)
 {
     for (uint32_t item_index = 0; item_index < item_count; item_index++)
     {
@@ -230,7 +225,7 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
             sys_read(pkg, enc_offset + data_offset, sfo, (uint32_t)data_size);
             aes128_ctr_xor(item_key, iv, data_offset / 16, sfo, (uint32_t)data_size);
 
-            parse_sfo_content(sfo, (uint32_t)data_size, NULL, title, NULL, NULL, NULL);
+            parse_sfo_content(sfo, (uint32_t)data_size, category, title, NULL, NULL, NULL);
             return;
         }
     }
@@ -381,7 +376,7 @@ int main(int argc, char* argv[])
     }
     else if (content_type == 7 || content_type == 0xe || content_type == 0xf || content_type == 0x10)
     {
-        // PSP / PSP-Go / PSP-Mini / PSP-NeoGeo
+        // PSP & PSP-PCEngine / PSP-Go / PSP-Mini / PSP-NeoGeo
         type = PKG_TYPE_PSP;
     }
     else if (content_type == 0x15)
@@ -432,6 +427,7 @@ int main(int argc, char* argv[])
 
     char content[256];
     char title[256];
+    char category[256];
     char min_version[256];
     char pkg_version[256];
     const char* id = content + 7;
@@ -444,7 +440,7 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
     {
-        find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, title);
+        find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
     }
     else // Vita
@@ -456,11 +452,10 @@ int main(int argc, char* argv[])
         }
         else // Vita APP, DLC or PATCH
         {
-            int patch = 0;
-            parse_sfo(pkg, sfo_offset, sfo_size, &patch, title, content, min_version, pkg_version);
+            parse_sfo(pkg, sfo_offset, sfo_size, category, title, content, min_version, pkg_version);
             rif_size = 512;
             
-            if (patch && type == PKG_TYPE_VITA_APP)
+            if (type == PKG_TYPE_VITA_APP && strcmp(category, "gp") == 0)
             {
                 type = PKG_TYPE_VITA_PATCH;
             }
@@ -482,7 +477,15 @@ int main(int argc, char* argv[])
     char root[1024];
     if (type == PKG_TYPE_PSP)
     {
-        const char* type_str = content_type == 7 ? "PSP" : content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
+        const char* type_str;
+        if (content_type == 7)
+        {
+            type_str = (strcmp(category, "HG") == 0) ? "PSP-PCEngine" : "PSP";
+        }
+        else
+        {
+            type_str = content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
+        }
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
         printf("[*] unpacking %s\n", type_str);
     }
@@ -527,11 +530,17 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_PSP)
     {
-        sys_vstrncat(root, sizeof(root), "pspemu");
+        snprintf(root, sizeof(root), "pspemu/ISO");
         out_add_folder(root);
 
-        sys_vstrncat(root, sizeof(root), "/ISO");
-        out_add_folder(root);
+        if (strcmp(category, "HG") == 0)
+        {
+            snprintf(root, sizeof(root), "pspemu/GAME");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/%.9s", id);
+            out_add_folder(root);
+        }
     }
     else if (type == PKG_TYPE_PSX)
     {
@@ -697,10 +706,24 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/%s [%.9s].iso", root, title, id);
+                    snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].iso", title, id);
                     unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    continue;
                 }
-                continue;
+                else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/GAME/%.9s/PSP-KEY.EDAT", id);
+                    unpack_psp_key(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    continue;
+                }
+                else if (strcmp("USRDIR/CONTENT/CONTENT.DAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/GAME/%.9s/CONTENT.DAT", id);
+                }
+                else
+                {
+                    continue;
+                }
             }
             else if (type == PKG_TYPE_VITA_PSM)
             {

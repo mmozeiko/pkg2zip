@@ -278,14 +278,18 @@ static int lzrc_decompress(void* out, int out_len, const void* in, int in_len)
     }
 }
 
-static void init_psp_decrypt(aes128_key* key, uint8_t* iv, const uint8_t* header)
+static void init_psp_decrypt(aes128_key* key, uint8_t* iv, int eboot, const uint8_t* mac, const uint8_t* header, uint32_t offset1, uint32_t offset2)
 {
-    uint8_t mac[16];
-    aes128_cmac(kirk7_key38, header, 0xc0, mac);
-
     uint8_t tmp[16];
     aes128_init_dec(key, kirk7_key63);
-    aes128_ecb_decrypt(key, header + 0xc0, tmp);
+    if (eboot)
+    {
+        aes128_ecb_decrypt(key, header + offset1, tmp);
+    }
+    else
+    {
+        memcpy(tmp, header + offset1, 16);
+    }
 
     aes128_key aes;
     aes128_init_dec(&aes, kirk7_key38);
@@ -293,9 +297,8 @@ static void init_psp_decrypt(aes128_key* key, uint8_t* iv, const uint8_t* header
 
     for (size_t i = 0; i < 16; i++)
     {
-        iv[i] = mac[i] ^ tmp[i] ^ header[0xa0 + i] ^ amctl_hashkey_3[i] ^ amctl_hashkey_5[i];
+        iv[i] = mac[i] ^ tmp[i] ^ header[offset2 + i] ^ amctl_hashkey_3[i] ^ amctl_hashkey_5[i];
     }
-
     aes128_init_dec(&aes, kirk7_key39);
     aes128_ecb_decrypt(&aes, iv, iv);
 
@@ -343,9 +346,12 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
         fatal("ERROR: unsupported data.psar block size %u, only %u supported!", iso_block, PSP_ISO_BLOCK_SIZE);
     }
 
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, psar_header, 0xc0, mac);
+
     aes128_key psp_key;
     uint8_t psp_iv[16];
-    init_psp_decrypt(&psp_key, psp_iv, psar_header);
+    init_psp_decrypt(&psp_key, psp_iv, 1, mac, psar_header, 0xc0, 0xa0);
     aes128_psp_decrypt(&psp_key, psp_iv, 0, psar_header + 0x40, 0x60);
 
     uint32_t iso_start = get32le(psar_header + 0x54);
@@ -412,5 +418,52 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
         }
     }
 
+    out_end_file();
+}
+
+void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+{
+    if (item_size < 0x90 + 0xa0)
+    {
+        fatal("ERROR: PSP-KEY.EDAT file is to short!");
+    }
+
+    uint8_t key_header[0xa0];
+    sys_read(pkg, enc_offset + item_offset + 0x90, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + 0x90) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        fatal("ERROR: wrong PSP-KEY.EDAT header signature!");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+    if (key_index != 1 || drm_type != 1)
+    {
+        fatal("ERROR: unsupported PSP-KEY.EDAT file, key/drm type is wrong!");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    aes128_key psp_key;
+    uint8_t psp_iv[16];
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x10);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x30, 0x30);
+
+    uint32_t data_size = get32le(key_header + 0x44);
+    uint32_t data_offset = get32le(key_header + 0x4c);
+
+    if (data_size != 0x10 || data_offset != 0x90)
+    {
+        fatal("ERROR: unsupported PSP-KEY.EDAT file, data/offset is wrong!");
+    }
+
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x90, 0x10);
+
+    out_begin_file(path);
+    out_write(key_header + 0x90, 0x10);
     out_end_file();
 }
