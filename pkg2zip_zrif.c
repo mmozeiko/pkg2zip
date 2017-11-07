@@ -1,5 +1,6 @@
 #include "pkg2zip_zrif.h"
 #include "pkg2zip_utils.h"
+#include "miniz_tdef.h"
 #include "puff.h"
 
 #include <assert.h>
@@ -60,20 +61,6 @@ static const uint8_t b64d[] =
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
     64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
 };
-
-static uint32_t adler32(const uint8_t* data, size_t size)
-{
-    uint32_t a = 1;
-    uint32_t b = 0;
-
-    for (size_t i = 0; i < size; i++)
-    {
-        a = (a + data[i]) % ADLER32_MOD;
-        b = (b + a) % ADLER32_MOD;
-    }
-
-    return (b << 16) | a;
-}
 
 static uint32_t base64_decode(const char* in, uint8_t* out)
 {
@@ -163,7 +150,7 @@ static uint32_t zlib_inflate(const uint8_t* in, uint32_t inlen, uint8_t* out, ui
     }
     memmove(out, out + dictlen, dlen);
 
-    if (adler32(out, dlen) != get32be(in + slen))
+    if (mz_adler32(MZ_ADLER32_INIT, out, dlen) != get32be(in + slen))
     {
         fatal("ERROR: zRIF is corrupted, wrong checksum\n");
     }

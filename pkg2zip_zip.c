@@ -12,8 +12,11 @@
 
 #define ZIP_MEMORY_BLOCK (1024 * 1024)
 
+// https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+
 #define ZIP_VERSION 45
 #define ZIP_METHOD_STORE 0
+#define ZIP_METHOD_DEFLATE 8
 #define ZIP_UTF8_FLAG (1 << 11)
 
 #define ZIP_DOS_ATTRIBUTE_DIRECTORY 0x10
@@ -32,7 +35,9 @@ struct zip_file
 {
     uint64_t offset;
     uint64_t size;
+    uint64_t compressed;
     uint32_t crc32;
+    int compress;
 };
 
 static zip_file* zip_new_file(zip* z)
@@ -74,7 +79,9 @@ void zip_add_folder(zip* z, const char* name)
     zip_file* f = zip_new_file(z);
     f->offset = z->total;
     f->size = 0;
+    f->compressed = 0;
     f->crc32 = 0;
+    f->compress = 0;
 
     uint8_t header[ZIP_LOCAL_HEADER_SIZE] = { 0x50, 0x4b, 0x03, 0x04 };
     // version needed to extract
@@ -101,7 +108,7 @@ void zip_add_folder(zip* z, const char* name)
     z->total += 1;
 }
 
-void zip_begin_file(zip* z, const char* name)
+void zip_begin_file(zip* z, const char* name, int compress)
 {
     size_t name_length = strlen(name);
     if (name_length > ZIP_MAX_FILENAME)
@@ -112,6 +119,8 @@ void zip_begin_file(zip* z, const char* name)
     zip_file* f = zip_new_file(z);
     f->offset = z->total;
     f->size = 0;
+    f->compressed = 0;
+    f->compress = compress;
     z->current = f;
 
     crc32_init(&z->crc32);
@@ -122,7 +131,7 @@ void zip_begin_file(zip* z, const char* name)
     // general purpose bit flag
     set16le(header + 6, ZIP_UTF8_FLAG);
     // compression method
-    set16le(header + 8, ZIP_METHOD_STORE);
+    set16le(header + 8, compress ? ZIP_METHOD_DEFLATE : ZIP_METHOD_STORE);
     // last mod file time
     set16le(header + 10, z->time);
     // last mod file date
@@ -135,29 +144,84 @@ void zip_begin_file(zip* z, const char* name)
 
     sys_write(z->file, z->total, name, (uint16_t)name_length);
     z->total += name_length;
+
+    if (compress)
+    {
+        int flags = tdefl_create_comp_flags_from_zip_params(MZ_BEST_SPEED, -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY);
+        tdefl_init(&z->tdefl, flags);
+    }
 }
 
 void zip_write_file(zip* z, const void* data, uint32_t size)
 {
-    sys_write(z->file, z->total, data, size);
-    z->total += size;
     z->current->size += size;
     crc32_update(&z->crc32, data, size);
+
+    if (z->current->compress)
+    {
+        const uint8_t* data8 = data;
+        while (size != 0)
+        {
+            uint8_t buffer[4096];
+
+            size_t isize = size;
+            size_t osize = sizeof(buffer);
+            tdefl_compress(&z->tdefl, data8, &isize, buffer, &osize, TDEFL_NO_FLUSH);
+
+            if (osize != 0)
+            {
+                sys_write(z->file, z->total, buffer, (uint32_t)osize);
+                z->current->compressed += osize;
+                z->total += osize;
+            }
+            data8 += isize;
+            size -= (uint32_t)isize;
+        }
+    }
+    else
+    {
+        sys_write(z->file, z->total, data, size);
+        z->current->compressed += size;
+        z->total += size;
+    }
 }
 
 void zip_end_file(zip* z)
 {
+    if (z->current->compress)
+    {
+        for (;;)
+        {
+            uint8_t buffer[4096];
+
+            size_t isize = 0;
+            size_t osize = sizeof(buffer);
+            tdefl_status st = tdefl_compress(&z->tdefl, NULL, &isize, buffer, &osize, TDEFL_FINISH);
+
+            if (osize != 0)
+            {
+                sys_write(z->file, z->total, buffer, (uint32_t)osize);
+                z->current->compressed += osize;
+                z->total += osize;
+            }
+            if (st == TDEFL_STATUS_DONE)
+            {
+                break;
+            }
+        }
+    }
+
     z->current->crc32 = crc32_done(&z->crc32);
-    uint64_t size = z->current->size;
-    if (size > 0)
+
+    if (z->current->size != 0)
     {
         uint8_t update[3 * sizeof(uint32_t)];
         // crc-32
         set32le(update + 0, z->current->crc32);
         // compressed size
-        set32le(update + 4, (uint32_t)min64(size, 0xffffffff));
+        set32le(update + 4, (uint32_t)min64(z->current->compressed, 0xffffffff));
         // uncompressed size
-        set32le(update + 8, (uint32_t)min64(size, 0xffffffff));
+        set32le(update + 8, (uint32_t)min64(z->current->size, 0xffffffff));
 
         sys_write(z->file, z->current->offset + ZIP_LOCAL_HEADER_CRC32_OFFSET, update, sizeof(update));
     }
@@ -186,6 +250,7 @@ void zip_close(zip* z)
         uint8_t extra[28];
         uint16_t extra_size = 0;
         uint64_t size = f->size;
+        uint64_t compressed = f->compressed;
         uint64_t offset = f->offset;
         uint32_t attributes = ZIP_DOS_ATTRIBUTE_ARCHIVE;
         if (is_folder)
@@ -200,7 +265,11 @@ void zip_close(zip* z)
         {
             if (size > 0xffffffff)
             {
-                extra_size += 2 * sizeof(uint64_t);
+                extra_size += sizeof(uint64_t);
+            }
+            if (compressed > 0xffffffff)
+            {
+                extra_size += sizeof(uint64_t);
             }
             if (offset > 0xffffffff)
             {
@@ -220,7 +289,7 @@ void zip_close(zip* z)
         // general purpose bit flag
         set16le(global + 8, ZIP_UTF8_FLAG);
         // compression method
-        set16le(global + 10, ZIP_METHOD_STORE);
+        set16le(global + 10, f->compress ? ZIP_METHOD_DEFLATE : ZIP_METHOD_STORE);
         // last mod file time
         set16le(global + 12, z->time);
         // last mod file date
@@ -228,7 +297,7 @@ void zip_close(zip* z)
         // crc-32
         set32le(global + 16, f->crc32);
         // compressed size
-        set32le(global + 20, (uint32_t)min64(size, 0xffffffff));
+        set32le(global + 20, (uint32_t)min64(compressed, 0xffffffff));
         // uncompressed size
         set32le(global + 24, (uint32_t)min64(size, 0xffffffff));
         // file name length
@@ -248,12 +317,15 @@ void zip_close(zip* z)
         // size of this "extra" block
         uint32_t extra_offset = 2 * sizeof(uint16_t);
         set16le(extra + 2, (uint16_t)(extra_size - extra_offset));
+        if (compressed > 0xffffffff)
+        {
+            // size of compressed data
+            set64le(extra + extra_offset, compressed);
+            extra_offset += sizeof(uint64_t);
+        }
         if (size > 0xffffffff)
         {
             // original uncompressed file size
-            set64le(extra + extra_offset, size);
-            extra_offset += sizeof(uint64_t);
-            // size of compressed data
             set64le(extra + extra_offset, size);
             extra_offset += sizeof(uint64_t);
         }

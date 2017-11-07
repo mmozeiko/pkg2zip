@@ -366,7 +366,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
         fatal("ERROR: offset table in data.psar file is too large!");
     }
 
-    out_begin_file(path);
+    out_begin_file(path, 1);
     for (uint32_t i = 0; i < block_count; i++)
     {
         uint64_t table_offset = item_offset + psar_offset + iso_table + 32 * i;
@@ -463,7 +463,7 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
     init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
     aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x90, 0x10);
 
-    out_begin_file(path);
+    out_begin_file(path, 0);
     out_write(key_header + 0x90, 0x10);
     out_end_file();
 }

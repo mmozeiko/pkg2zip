@@ -36,11 +36,11 @@ void out_add_folder(const char* path)
     }
 }
 
-void out_begin_file(const char* name)
+void out_begin_file(const char* name, int compress)
 {
     if (out_zipped)
     {
-        zip_begin_file(&out_zip, name);
+        zip_begin_file(&out_zip, name, compress);
     }
     else
     {

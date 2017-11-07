@@ -737,7 +737,7 @@ int main(int argc, char* argv[])
 
             uint64_t offset = data_offset;
 
-            out_begin_file(path);
+            out_begin_file(path, 0);
             while (data_size != 0)
             {
                 uint8_t buffer[1 << 16];
@@ -769,7 +769,7 @@ int main(int argc, char* argv[])
         printf("[*] creating sce_sys/package/head.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
 
-        out_begin_file(path);
+        out_begin_file(path, 0);
         uint64_t head_size = enc_offset + items_size;
         uint64_t head_offset = 0;
         while (head_size != 0)
@@ -786,7 +786,7 @@ int main(int argc, char* argv[])
         printf("[*] creating sce_sys/package/tail.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
-        out_begin_file(path);
+        out_begin_file(path, 0);
         uint64_t tail_offset = enc_offset + enc_size;
         while (tail_offset != pkg_size)
         {
@@ -802,7 +802,7 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
-        out_begin_file(path);
+        out_begin_file(path, 0);
         out_write(stat, sizeof(stat));
         out_end_file();
     }
@@ -824,7 +824,7 @@ int main(int argc, char* argv[])
             snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
         }
 
-        out_begin_file(path);
+        out_begin_file(path, 0);
         out_write(rif, rif_size);
         out_end_file();
     }
@@ -849,7 +849,7 @@ int main(int argc, char* argv[])
 
         printf("[*] creating RW/System/content_id\n");
         snprintf(path, sizeof(path), "%s/RW/System/content_id", root);
-        out_begin_file(path);
+        out_begin_file(path, 0);
         out_write(pkg_header + 0x30, 0x30);
         out_end_file();
 
@@ -857,7 +857,7 @@ int main(int argc, char* argv[])
         snprintf(path, sizeof(path), "%s/RW/System/pm.dat", root);
 
         uint8_t pm[1 << 16] = { 0 };
-        out_begin_file(path);
+        out_begin_file(path, 0);
         out_write(pm, sizeof(pm));
         out_end_file();
     }
