@@ -526,7 +526,7 @@ int main(int argc, char* argv[])
     else
     {
         assert(0);
-        fatal("ERROR: unsupported type");
+        fatal("ERROR: unsupported type\n");
     }
 
     if (zipped)
@@ -603,7 +603,7 @@ int main(int argc, char* argv[])
     else
     {
         assert(0);
-        fatal("ERROR: unsupported type");
+        fatal("ERROR: unsupported type\n");
     }
 
     printf("[*] decrypting...\n");
@@ -749,7 +749,7 @@ int main(int argc, char* argv[])
             out_begin_file(path, 0);
             while (data_size != 0)
             {
-                uint8_t buffer[1 << 16];
+                uint8_t PKG_ALIGN(16) buffer[1 << 16];
                 uint32_t size = (uint32_t)min64(data_size, sizeof(buffer));
                 sys_read(pkg, enc_offset + offset, buffer, size);
 
@@ -783,7 +783,7 @@ int main(int argc, char* argv[])
         uint64_t head_offset = 0;
         while (head_size != 0)
         {
-            uint8_t buffer[1 << 16];
+            uint8_t PKG_ALIGN(16) buffer[1 << 16];
             uint32_t size = (uint32_t)min64(head_size, sizeof(buffer));
             sys_read(pkg, head_offset, buffer, size);
             out_write(buffer, size);
@@ -799,7 +799,7 @@ int main(int argc, char* argv[])
         uint64_t tail_offset = enc_offset + enc_size;
         while (tail_offset != pkg_size)
         {
-            uint8_t buffer[1 << 16];
+            uint8_t PKG_ALIGN(16) buffer[1 << 16];
             uint32_t size = (uint32_t)min64(pkg_size - tail_offset, sizeof(buffer));
             sys_read(pkg, tail_offset, buffer, size);
             out_write(buffer, size);

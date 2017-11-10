@@ -315,7 +315,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 {
     if (item_size < 0x28)
     {
-        fatal("ERROR: eboot.pbp file is to short!");
+        fatal("ERROR: eboot.pbp file is to short!\n");
     }
 
     uint8_t eboot_header[0x28];
@@ -324,13 +324,13 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
     if (memcmp(eboot_header, "\x00PBP", 4) != 0)
     {
-        fatal("ERROR: wrong eboot.pbp header signature!");
+        fatal("ERROR: wrong eboot.pbp header signature!\n");
     }
 
     uint32_t psar_offset = get32le(eboot_header + 0x24);
     if (psar_offset + 256 > item_size)
     {
-        fatal("ERROR: eboot.pbp file is to short!");
+        fatal("ERROR: eboot.pbp file is to short!\n");
     }
     assert(psar_offset % 16 == 0);
 
@@ -340,7 +340,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
     if (memcmp(psar_header, "NPUMDIMG", 8) != 0)
     {
-        fatal("ERROR: wrong data.psar header signature!");
+        fatal("ERROR: wrong data.psar header signature!\n");
     }
 
     uint32_t iso_block = get32le(psar_header + 0x0c);
@@ -411,10 +411,10 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
         if (psar_offset + block_size > item_size)
         {
-            fatal("ERROR: iso block size/offset is to large!");
+            fatal("ERROR: iso block size/offset is to large!\n");
         }
 
-        uint8_t data[16 * ISO_SECTOR_SIZE];
+        uint8_t PKG_ALIGN(16) data[16 * ISO_SECTOR_SIZE];
 
         uint64_t abs_offset = item_offset + psar_offset + block_offset;
         sys_read(pkg, enc_offset + abs_offset, data, block_size);
@@ -541,7 +541,7 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 {
     if (item_size < 0x90 + 0xa0)
     {
-        fatal("ERROR: PSP-KEY.EDAT file is to short!");
+        fatal("ERROR: PSP-KEY.EDAT file is to short!\n");
     }
 
     uint8_t key_header[0xa0];
@@ -550,14 +550,14 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 
     if (memcmp(key_header, "\x00PGD", 4) != 0)
     {
-        fatal("ERROR: wrong PSP-KEY.EDAT header signature!");
+        fatal("ERROR: wrong PSP-KEY.EDAT header signature!\n");
     }
 
     uint32_t key_index = get32le(key_header + 4);
     uint32_t drm_type = get32le(key_header + 8);
     if (key_index != 1 || drm_type != 1)
     {
-        fatal("ERROR: unsupported PSP-KEY.EDAT file, key/drm type is wrong!");
+        fatal("ERROR: unsupported PSP-KEY.EDAT file, key/drm type is wrong!\n");
     }
 
     uint8_t mac[16];
@@ -573,7 +573,7 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 
     if (data_size != 0x10 || data_offset != 0x90)
     {
-        fatal("ERROR: unsupported PSP-KEY.EDAT file, data/offset is wrong!");
+        fatal("ERROR: unsupported PSP-KEY.EDAT file, data/offset is wrong!\n");
     }
 
     init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);

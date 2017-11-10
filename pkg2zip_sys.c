@@ -201,12 +201,12 @@ void* sys_realloc(void* ptr, size_t size)
     }
     else
     {
-        fatal("error using sys_realloc function");
+        fatal("ERROR: internal error, wrong sys_realloc usage\n");
     }
 
     if (!result)
     {
-        fatal("out of memory");
+        fatal("ERROR: out of memory\n");
     }
 
     return result;
