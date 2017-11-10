@@ -258,3 +258,70 @@ uint32_t crc32_done(crc32_ctx* ctx)
 
     return ~ctx->crc[0];
 }
+
+static uint32_t crc32_gfmulv(const uint32_t* m, uint32_t v)
+{
+    uint32_t r = 0;
+    while (v)
+    {
+        if (v & 1)
+        {
+            r ^= *m;
+        }
+        v >>= 1;
+        m++;
+    }
+    return r;
+}
+
+static void crc32_gfsq(const uint32_t* m, uint32_t* r)
+{
+    for (size_t i = 0; i < 32; i++)
+    {
+        r[i] = crc32_gfmulv(m, m[i]);
+    }
+}
+
+uint32_t crc32_combine(uint32_t a, uint32_t b, uint32_t blen)
+{
+    uint32_t m1[32];
+    uint32_t m2[32];
+
+    m1[0] = 0xedb88320;
+    for (uint32_t i = 1; i < 32; i++)
+    {
+        m1[i] = 1 << (i - 1);
+    }
+
+    crc32_gfsq(m1, m2);
+    crc32_gfsq(m2, m1);
+
+    for (;;)
+    {
+        crc32_gfsq(m1, m2);
+        if (blen & 1)
+        {
+            a = crc32_gfmulv(m2, a);
+        }
+        blen >>= 1;
+
+        if (blen == 0)
+        {
+            break;
+        }
+
+        crc32_gfsq(m2, m1);
+        if (blen & 1)
+        {
+            a = crc32_gfmulv(m1, a);
+        }
+        blen >>= 1;
+
+        if (blen == 0)
+        {
+            break;
+        }
+    }
+
+    return a ^ b;
+}

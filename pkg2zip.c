@@ -275,6 +275,7 @@ int main(int argc, char* argv[])
     printf("pkg2zip v1.8\n");
 
     int zipped = 1;
+    int cso = 5;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
@@ -282,6 +283,14 @@ int main(int argc, char* argv[])
         if (strcmp(argv[i], "-x") == 0)
         {
             zipped = 0;
+        }
+        else if (strncmp(argv[i], "-c", 2) == 0)
+        {
+            if (argv[i][2] != 0)
+            {
+                cso = atoi(argv[i] + 2);
+                cso = cso > 9 ? 9 : cso < 0 ? 0 : cso;
+            }
         }
         else
         {
@@ -300,7 +309,7 @@ int main(int argc, char* argv[])
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        fatal("Usage: %s [-x] file.pkg [zRIF]\n", argv[0]);
+        fatal("Usage: %s [-x] [-c[N]] file.pkg [zRIF]\n", argv[0]);
     }
 
     printf("[*] loading...\n");
@@ -706,8 +715,8 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].iso", title, id);
-                    unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
+                    unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);
                     continue;
                 }
                 else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)

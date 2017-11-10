@@ -1,12 +1,15 @@
 #include "pkg2zip_psp.h"
 #include "pkg2zip_out.h"
+#include "pkg2zip_crc32.h"
 #include "pkg2zip_utils.h"
+#include "miniz_tdef.h"
 
 #include <assert.h>
 #include <string.h>
 
-#define PSP_ISO_BLOCK_SIZE 16
-#define PSP_ISO_SECTOR_SIZE 2048
+#define ISO_SECTOR_SIZE 2048
+
+#define CSO_HEADER_SIZE 24
 
 // https://vitadevwiki.com/vita/Keys_NonVita#PSPAESKirk4.2F7
 static const uint8_t kirk7_key38[] = { 0x12, 0x46, 0x8d, 0x7e, 0x1c, 0x42, 0x20, 0x9b, 0xba, 0x54, 0x26, 0x83, 0x5e, 0xb0, 0x33, 0x03 };
@@ -308,7 +311,7 @@ static void init_psp_decrypt(aes128_key* key, uint8_t* iv, int eboot, const uint
     }
 }
 
-void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size, int cso)
 {
     if (item_size < 0x28)
     {
@@ -341,9 +344,9 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
     }
 
     uint32_t iso_block = get32le(psar_header + 0x0c);
-    if (iso_block != PSP_ISO_BLOCK_SIZE)
+    if (iso_block > 16)
     {
-        fatal("ERROR: unsupported data.psar block size %u, only %u supported!", iso_block, PSP_ISO_BLOCK_SIZE);
+        fatal("ERROR: unsupported data.psar block size %u, max %u supported!\b", iso_block, 16);
     }
 
     uint8_t mac[16];
@@ -357,16 +360,37 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
     uint32_t iso_start = get32le(psar_header + 0x54);
     uint32_t iso_end = get32le(psar_header + 0x64);
     uint32_t iso_total = iso_end - iso_start - 1;
-    uint32_t block_count = (iso_total + PSP_ISO_BLOCK_SIZE - 1) / PSP_ISO_BLOCK_SIZE;
+    uint32_t block_count = (iso_total + iso_block - 1) / iso_block;
 
     uint32_t iso_table = get32le(psar_header + 0x6c);
 
     if (iso_table + block_count * 32 > item_size)
     {
-        fatal("ERROR: offset table in data.psar file is too large!");
+        fatal("ERROR: offset table in data.psar file is too large!\n");
     }
 
-    out_begin_file(path, 1);
+    mz_uint cso_compress_flags = 0;
+    uint32_t cso_index = 0;
+    uint32_t cso_offset = 0;
+    uint64_t cso_size = 0;
+    uint32_t* cso_block = NULL;
+    uint32_t initial_size = 0;
+
+    uint64_t file_offset = out_begin_file(path, !cso);
+    if (cso)
+    {
+        cso_size = block_count * iso_block * ISO_SECTOR_SIZE;
+        cso_compress_flags = tdefl_create_comp_flags_from_zip_params(cso, -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY);
+
+        uint32_t cso_block_count = (uint32_t)(1 + (cso_size + ISO_SECTOR_SIZE - 1) / ISO_SECTOR_SIZE);
+        cso_block = sys_realloc(NULL, cso_block_count * sizeof(uint32_t));
+
+        initial_size = CSO_HEADER_SIZE + cso_block_count * sizeof(uint32_t);
+        out_set_offset(file_offset + initial_size);
+
+        cso_offset = initial_size;
+    }
+
     for (uint32_t i = 0; i < block_count; i++)
     {
         uint64_t table_offset = item_offset + psar_offset + iso_table + 32 * i;
@@ -390,7 +414,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
             fatal("ERROR: iso block size/offset is to large!");
         }
 
-        uint8_t data[PSP_ISO_BLOCK_SIZE * PSP_ISO_SECTOR_SIZE];
+        uint8_t data[16 * ISO_SECTOR_SIZE];
 
         uint64_t abs_offset = item_offset + psar_offset + block_offset;
         sys_read(pkg, enc_offset + abs_offset, data, block_size);
@@ -402,20 +426,112 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
         }
 
         uint32_t out_size;
-        if (block_size == sizeof(data))
+        if (block_size == iso_block * ISO_SECTOR_SIZE)
         {
-            out_write(data, (uint32_t)block_size);
+            if (cso)
+            {
+                for (size_t n = 0; n < iso_block * ISO_SECTOR_SIZE; n += ISO_SECTOR_SIZE)
+                {
+                    cso_block[cso_index] = cso_offset;
+
+                    uint8_t PKG_ALIGN(16) output[ISO_SECTOR_SIZE];
+                    size_t insize = ISO_SECTOR_SIZE;
+                    size_t outsize = sizeof(output);
+
+                    tdefl_compressor c;
+                    tdefl_init(&c, cso_compress_flags);
+                    tdefl_status st = tdefl_compress(&c, data + n, &insize, output, &outsize, TDEFL_FINISH);
+                    if (st == TDEFL_STATUS_DONE)
+                    {
+                        out_write(output, (uint32_t)outsize);
+                        cso_offset += (uint32_t)outsize;
+                    }
+                    else
+                    {
+                        cso_block[cso_index] |= 0x80000000;
+                        out_write(data + n, ISO_SECTOR_SIZE);
+                        cso_offset += ISO_SECTOR_SIZE;
+                    }
+                    cso_index++;
+                }
+            }
+            else
+            {
+                out_write(data, (uint32_t)block_size);
+            }
         }
         else
         {
-            uint8_t uncompressed[PSP_ISO_BLOCK_SIZE * PSP_ISO_SECTOR_SIZE];
+            uint8_t PKG_ALIGN(16) uncompressed[16 * ISO_SECTOR_SIZE];
             out_size = lzrc_decompress(uncompressed, sizeof(uncompressed), data, block_size);
-            if (out_size != sizeof(uncompressed))
+            if (out_size != iso_block * ISO_SECTOR_SIZE)
             {
-                fatal("ERROR: internal error - lzrc decompression failed! pkg may be corrupted?");
+                fatal("ERROR: internal error - lzrc decompression failed! pkg may be corrupted?\n");
             }
-            out_write(uncompressed, (uint32_t)out_size);
+            if (cso)
+            {
+                for (size_t n = 0; n < iso_block * ISO_SECTOR_SIZE; n += ISO_SECTOR_SIZE)
+                {
+                    cso_block[cso_index] = cso_offset;
+
+                    uint8_t output[ISO_SECTOR_SIZE];
+                    size_t insize = ISO_SECTOR_SIZE;
+                    size_t outsize = sizeof(output);
+
+                    tdefl_compressor c;
+                    tdefl_init(&c, cso_compress_flags);
+                    tdefl_status st = tdefl_compress(&c, uncompressed + n, &insize, output, &outsize, TDEFL_FINISH);
+                    if (st == TDEFL_STATUS_DONE)
+                    {
+                        out_write(output, (uint32_t)outsize);
+                        cso_offset += (uint32_t)outsize;
+                    }
+                    else
+                    {
+                        cso_block[cso_index] |= 0x80000000;
+                        out_write(uncompressed + n, ISO_SECTOR_SIZE);
+                        cso_offset += ISO_SECTOR_SIZE;
+                    }
+                    cso_index++;
+                }
+            }
+            else
+            {
+                out_write(uncompressed, (uint32_t)out_size);
+            }
         }
+    }
+
+    if (cso)
+    {
+        cso_block[cso_index++] = cso_offset;
+
+        uint8_t cso_header[CSO_HEADER_SIZE] = { 0x43, 0x49, 0x53, 0x4f };
+        // header size
+        set32le(cso_header + 4, sizeof(cso_header));
+        // original size
+        set64le(cso_header + 8, cso_size);
+        // block size
+        set32le(cso_header + 16, ISO_SECTOR_SIZE);
+        // version
+        cso_header[20] = 1;
+
+        out_write_at(file_offset, cso_header, sizeof(cso_header));
+        out_write_at(file_offset + sizeof(cso_header), cso_block, cso_index * sizeof(uint32_t));
+
+        crc32_ctx cheader;
+        crc32_init(&cheader);
+        crc32_update(&cheader, cso_header, sizeof(cso_header));
+        crc32_update(&cheader, cso_block, cso_index * sizeof(uint32_t));
+
+        uint32_t header_crc32 = crc32_done(&cheader);
+        uint32_t data_crc32 = out_zip_get_crc32();
+        uint32_t data_len = (uint32_t)(cso_offset - initial_size);
+
+        uint32_t crc32 = crc32_combine(header_crc32, data_crc32, data_len);
+        out_zip_set_crc32(crc32);
+
+        sys_realloc(cso_block, 0);
     }
 
     out_end_file();

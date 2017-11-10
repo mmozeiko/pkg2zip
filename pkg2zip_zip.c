@@ -108,7 +108,7 @@ void zip_add_folder(zip* z, const char* name)
     z->total += 1;
 }
 
-void zip_begin_file(zip* z, const char* name, int compress)
+uint64_t zip_begin_file(zip* z, const char* name, int compress)
 {
     size_t name_length = strlen(name);
     if (name_length > ZIP_MAX_FILENAME)
@@ -124,6 +124,7 @@ void zip_begin_file(zip* z, const char* name, int compress)
     z->current = f;
 
     crc32_init(&z->crc32);
+    z->crc32_set = 0;
 
     uint8_t header[ZIP_LOCAL_HEADER_SIZE] = { 0x50, 0x4b, 0x03, 0x04 };
     // version needed to extract
@@ -150,6 +151,8 @@ void zip_begin_file(zip* z, const char* name, int compress)
         int flags = tdefl_create_comp_flags_from_zip_params(MZ_BEST_SPEED, -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY);
         tdefl_init(&z->tdefl, flags);
     }
+
+    return z->total - f->offset;
 }
 
 void zip_write_file(zip* z, const void* data, uint32_t size)
@@ -211,7 +214,10 @@ void zip_end_file(zip* z)
         }
     }
 
-    z->current->crc32 = crc32_done(&z->crc32);
+    if (!z->crc32_set)
+    {
+        z->current->crc32 = crc32_done(&z->crc32);
+    }
 
     if (z->current->size != 0)
     {
@@ -399,4 +405,32 @@ void zip_close(zip* z)
     sys_close(z->file);
 
     sys_realloc(z->files, 0);
+}
+
+void zip_write_file_at(zip* z, uint64_t offset, const void* data, uint32_t size)
+{
+    if (z->current->compress)
+    {
+        fatal("ERROR: cannot write at specific offset for compressed files\n");
+    }
+
+    sys_write(z->file, z->current->offset + offset, data, size);
+    z->current->size += size;
+    z->current->compressed += size;
+}
+
+void zip_set_offset(zip* z, uint64_t offset)
+{
+    z->total = z->current->offset + offset;
+}
+
+void zip_set_crc32(zip* z, uint32_t crc)
+{
+    z->current->crc32 = crc;
+    z->crc32_set = 1;
+}
+
+uint32_t zip_get_crc32(zip* z)
+{
+    return crc32_done(&z->crc32);
 }
