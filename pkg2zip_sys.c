@@ -199,7 +199,7 @@ sys_file sys_open(const char* fname, uint64_t* size)
     int fd = open(fname, O_RDONLY);
     if (fd < 0)
     {
-        error("ERROR: cannot open '%s' file\n", fname);
+        sys_error("ERROR: cannot open '%s' file\n", fname);
     }
 
     struct stat st;
