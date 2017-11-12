@@ -11,8 +11,6 @@
 #  define PKG_ALIGN(x) __attribute__((aligned(x)))
 #endif
 
-void NORETURN fatal(const char* msg, ...);
-
 static inline uint32_t min32(uint32_t a, uint32_t b)
 {
     return a < b ? a : b;

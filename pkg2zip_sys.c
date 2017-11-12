@@ -11,6 +11,64 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+static HANDLE gStdout;
+static int gStdoutRedirected;
+
+void sys_output_init(void)
+{
+    SetConsoleOutputCP(CP_UTF8);
+    gStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    DWORD mode;
+    gStdoutRedirected = !GetConsoleMode(gStdout, &mode);
+}
+
+void sys_output(const char* msg, ...)
+{
+    char buffer[1024];
+
+    va_list arg;
+    va_start(arg, msg);
+    vsnprintf(buffer, sizeof(buffer), msg, arg);
+    va_end(arg);
+
+    if (!gStdoutRedirected)
+    {
+        WCHAR wbuffer[sizeof(buffer)];
+        int wcount = MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, sizeof(buffer));
+
+        DWORD written;
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wbuffer, wcount, &written, NULL);
+        return;
+    }
+    fputs(buffer, stdout);
+}
+
+void sys_error(const char* msg, ...)
+{
+    char buffer[1024];
+
+    va_list arg;
+    va_start(arg, msg);
+    vsnprintf(buffer, sizeof(buffer), msg, arg);
+    va_end(arg);
+
+    DWORD mode;
+    if (GetConsoleMode(GetStdHandle(STD_ERROR_HANDLE), &mode))
+    {
+        WCHAR wbuffer[sizeof(buffer)];
+        int wcount = MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, sizeof(buffer));
+
+        DWORD written;
+        WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wbuffer, wcount, &written, NULL);
+
+        exit(EXIT_FAILURE);
+    }
+    fputs(buffer, stderr);
+
+    exit(EXIT_FAILURE);
+}
+
 static void sys_mkdir_real(const char* path)
 {
     WCHAR wpath[MAX_PATH];
@@ -20,7 +78,7 @@ static void sys_mkdir_real(const char* path)
     {
         if (GetLastError() != ERROR_ALREADY_EXISTS)
         {
-            fatal("ERROR: cannot create '%s' folder\n", path);
+            sys_error("ERROR: cannot create '%s' folder\n", path);
         }
     }
 }
@@ -33,13 +91,13 @@ sys_file sys_open(const char* fname, uint64_t* size)
     HANDLE handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        fatal("ERROR: cannot open '%s' file\n", fname);
+        sys_error("ERROR: cannot open '%s' file\n", fname);
     }
 
     LARGE_INTEGER sz;
     if (!GetFileSizeEx(handle, &sz))
     {
-        fatal("ERROR: cannot get size of '%s' file\n", fname);
+        sys_error("ERROR: cannot get size of '%s' file\n", fname);
     }
     *size = sz.QuadPart;
 
@@ -54,7 +112,7 @@ sys_file sys_create(const char* fname)
     HANDLE handle = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        fatal("ERROR: cannot create '%s' file\n", fname);
+        sys_error("ERROR: cannot create '%s' file\n", fname);
     }
 
     return handle;
@@ -64,7 +122,7 @@ void sys_close(sys_file file)
 {
     if (!CloseHandle(file))
     {
-        fatal("ERROR: failed to close file\n");
+        sys_error("ERROR: failed to close file\n");
     }
 }
 
@@ -77,7 +135,7 @@ void sys_read(sys_file file, uint64_t offset, void* buffer, uint32_t size)
     ov.OffsetHigh = (uint32_t)(offset >> 32);
     if (!ReadFile(file, buffer, size, &read, &ov) || read != size)
     {
-        fatal("ERROR: failed to read %u bytes from file\n", size);
+        sys_error("ERROR: failed to read %u bytes from file\n", size);
     }
 }
 
@@ -90,7 +148,7 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
     ov.OffsetHigh = (uint32_t)(offset >> 32);
     if (!WriteFile(file, buffer, size, &written, &ov) || written != size)
     {
-        fatal("ERROR: failed to write %u bytes to file\n", size);
+        sys_error("ERROR: failed to write %u bytes to file\n", size);
     }
 }
 
@@ -103,13 +161,35 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 #include <unistd.h>
 #include <sys/stat.h>
 
+void sys_output_init(void)
+{
+}
+
+void sys_output(const char* msg, ...)
+{
+    va_list arg;
+    va_start(arg, msg);
+    vfprintf(stdout, msg, arg);
+    va_end(arg);
+}
+
+void sys_error(const char* msg, ...)
+{
+    va_list arg;
+    va_start(arg, msg);
+    vfprintf(stderr, msg, arg);
+    va_end(arg);
+
+    exit(EXIT_FAILURE);
+}
+
 static void sys_mkdir_real(const char* path)
 {
     if (mkdir(path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0)
     {
         if (errno != EEXIST)
         {
-            fatal("ERROR: cannot create '%s' folder\n", path);
+            sys_error("ERROR: cannot create '%s' folder\n", path);
         }
     }
 }
@@ -119,13 +199,13 @@ sys_file sys_open(const char* fname, uint64_t* size)
     int fd = open(fname, O_RDONLY);
     if (fd < 0)
     {
-        fatal("ERROR: cannot open '%s' file\n", fname);
+        error("ERROR: cannot open '%s' file\n", fname);
     }
 
     struct stat st;
     if (fstat(fd, &st) != 0)
     {
-        fatal("ERROR: cannot get size of '%s' file\n", fname);
+        sys_error("ERROR: cannot get size of '%s' file\n", fname);
     }
     *size = st.st_size;
 
@@ -137,7 +217,7 @@ sys_file sys_create(const char* fname)
     int fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd < 0)
     {
-        fatal("ERROR: cannot create '%s' file\n", fname);
+        sys_error("ERROR: cannot create '%s' file\n", fname);
     }
 
     return (void*)(intptr_t)fd;
@@ -147,7 +227,7 @@ void sys_close(sys_file file)
 {
     if (close((int)(intptr_t)file) != 0)
     {
-        fatal("ERROR: failed to close file\n");
+        sys_error("ERROR: failed to close file\n");
     }
 }
 
@@ -156,7 +236,7 @@ void sys_read(sys_file file, uint64_t offset, void* buffer, uint32_t size)
     ssize_t read = pread((int)(intptr_t)file, buffer, size, offset);
     if (read < 0 || read != (ssize_t)size)
     {
-        fatal("ERROR: failed to read %u bytes from file\n", size);
+        sys_error("ERROR: failed to read %u bytes from file\n", size);
     }
 }
 
@@ -165,7 +245,7 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
     ssize_t wrote = pwrite((int)(intptr_t)file, buffer, size, offset);
     if (wrote < 0 || wrote != (ssize_t)size)
     {
-        fatal("ERROR: failed to read %u bytes from file\n", size);
+        sys_error("ERROR: failed to read %u bytes from file\n", size);
     }
 }
 
@@ -201,12 +281,12 @@ void* sys_realloc(void* ptr, size_t size)
     }
     else
     {
-        fatal("ERROR: internal error, wrong sys_realloc usage\n");
+        sys_error("ERROR: internal error, wrong sys_realloc usage\n");
     }
 
     if (!result)
     {
-        fatal("ERROR: out of memory\n");
+        sys_error("ERROR: out of memory\n");
     }
 
     return result;

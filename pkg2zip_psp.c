@@ -50,7 +50,7 @@ static void rc_init(lzrc_decode* rc, void* out, int out_len, const void* in, int
 {
     if (in_len < 5)
     {
-        fatal("ERROR: internal error - lzrc input underflow! pkg may be corrupted?\n");
+        sys_error("ERROR: internal error - lzrc input underflow! pkg may be corrupted?\n");
     }
 
     rc->input = in;
@@ -199,7 +199,7 @@ static int lzrc_decompress(void* out, int out_len, const void* in, int in_len)
 
             if (rc.out_ptr == rc.out_len)
             {
-                fatal("ERROR: internal error - lzrc output overflow! pkg may be corrupted?\n");
+                sys_error("ERROR: internal error - lzrc output overflow! pkg may be corrupted?\n");
             }
             rc.output[rc.out_ptr++] = (uint8_t)byte;
             last_byte = (uint8_t)byte;
@@ -261,12 +261,12 @@ static int lzrc_decompress(void* out, int out_len, const void* in, int in_len)
             // copy match bytes
             if (match_dist > rc.out_ptr)
             {
-                fatal("ERROR: internal error - lzrc match_dist out of range! pkg may be corrupted?\n");
+                sys_error("ERROR: internal error - lzrc match_dist out of range! pkg may be corrupted?\n");
             }
 
             if (rc.out_ptr + match_len + 1 > rc.out_len)
             {
-                fatal("ERROR: internal error - lzrc output overflow! pkg may be corrupted?\n");
+                sys_error("ERROR: internal error - lzrc output overflow! pkg may be corrupted?\n");
             }
 
             const uint8_t* match_src = rc.output + rc.out_ptr - match_dist;
@@ -315,7 +315,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 {
     if (item_size < 0x28)
     {
-        fatal("ERROR: eboot.pbp file is to short!\n");
+        sys_error("ERROR: eboot.pbp file is to short!\n");
     }
 
     uint8_t eboot_header[0x28];
@@ -324,13 +324,13 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
     if (memcmp(eboot_header, "\x00PBP", 4) != 0)
     {
-        fatal("ERROR: wrong eboot.pbp header signature!\n");
+        sys_error("ERROR: wrong eboot.pbp header signature!\n");
     }
 
     uint32_t psar_offset = get32le(eboot_header + 0x24);
     if (psar_offset + 256 > item_size)
     {
-        fatal("ERROR: eboot.pbp file is to short!\n");
+        sys_error("ERROR: eboot.pbp file is to short!\n");
     }
     assert(psar_offset % 16 == 0);
 
@@ -340,13 +340,13 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
     if (memcmp(psar_header, "NPUMDIMG", 8) != 0)
     {
-        fatal("ERROR: wrong data.psar header signature!\n");
+        sys_error("ERROR: wrong data.psar header signature!\n");
     }
 
     uint32_t iso_block = get32le(psar_header + 0x0c);
     if (iso_block > 16)
     {
-        fatal("ERROR: unsupported data.psar block size %u, max %u supported!\b", iso_block, 16);
+        sys_error("ERROR: unsupported data.psar block size %u, max %u supported!\b", iso_block, 16);
     }
 
     uint8_t mac[16];
@@ -366,7 +366,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
     if (iso_table + block_count * 32 > item_size)
     {
-        fatal("ERROR: offset table in data.psar file is too large!\n");
+        sys_error("ERROR: offset table in data.psar file is too large!\n");
     }
 
     mz_uint cso_compress_flags = 0;
@@ -411,7 +411,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
 
         if (psar_offset + block_size > item_size)
         {
-            fatal("ERROR: iso block size/offset is to large!\n");
+            sys_error("ERROR: iso block size/offset is to large!\n");
         }
 
         uint8_t PKG_ALIGN(16) data[16 * ISO_SECTOR_SIZE];
@@ -466,7 +466,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
             out_size = lzrc_decompress(uncompressed, sizeof(uncompressed), data, block_size);
             if (out_size != iso_block * ISO_SECTOR_SIZE)
             {
-                fatal("ERROR: internal error - lzrc decompression failed! pkg may be corrupted?\n");
+                sys_error("ERROR: internal error - lzrc decompression failed! pkg may be corrupted?\n");
             }
             if (cso)
             {
@@ -541,7 +541,7 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 {
     if (item_size < 0x90 + 0xa0)
     {
-        fatal("ERROR: PSP-KEY.EDAT file is to short!\n");
+        sys_error("ERROR: PSP-KEY.EDAT file is to short!\n");
     }
 
     uint8_t key_header[0xa0];
@@ -550,14 +550,14 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 
     if (memcmp(key_header, "\x00PGD", 4) != 0)
     {
-        fatal("ERROR: wrong PSP-KEY.EDAT header signature!\n");
+        sys_error("ERROR: wrong PSP-KEY.EDAT header signature!\n");
     }
 
     uint32_t key_index = get32le(key_header + 4);
     uint32_t drm_type = get32le(key_header + 8);
     if (key_index != 1 || drm_type != 1)
     {
-        fatal("ERROR: unsupported PSP-KEY.EDAT file, key/drm type is wrong!\n");
+        sys_error("ERROR: unsupported PSP-KEY.EDAT file, key/drm type is wrong!\n");
     }
 
     uint8_t mac[16];
@@ -573,7 +573,7 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
 
     if (data_size != 0x10 || data_offset != 0x90)
     {
-        fatal("ERROR: unsupported PSP-KEY.EDAT file, data/offset is wrong!\n");
+        sys_error("ERROR: unsupported PSP-KEY.EDAT file, data/offset is wrong!\n");
     }
 
     init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);

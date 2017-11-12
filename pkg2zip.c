@@ -25,10 +25,9 @@ static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
 static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, char* category, char* title, char* content, char* min_version, char* pkg_version)
 {
-
     if (get32le(sfo) != 0x46535000)
     {
-        fatal("ERROR: incorrect sfo signature\n");
+        sys_error("ERROR: incorrect sfo signature\n");
     }
 
     uint32_t keys = get32le(sfo + 8);
@@ -44,7 +43,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, char* categ
     {
         if (i * 16 + 20 + 2 > sfo_size)
         {
-            fatal("ERROR: sfo information is too small\n");
+            sys_error("ERROR: sfo information is too small\n");
         }
 
         char* key = (char*)sfo + keys + get16le(sfo + i * 16 + 20);
@@ -79,7 +78,7 @@ static void parse_sfo_content(const uint8_t* sfo, uint32_t sfo_size, char* categ
 
     if (title_index < 0)
     {
-        fatal("ERROR: cannot find title from sfo file, pkg is probably corrupted\n");
+        sys_error("ERROR: cannot find title from sfo file, pkg is probably corrupted\n");
     }
 
     char* value = (char*)sfo + values + get32le(sfo + title_index * 16 + 20 + 12);
@@ -168,11 +167,11 @@ static void parse_sfo(sys_file f, uint64_t sfo_offset, uint32_t sfo_size, char* 
     uint8_t sfo[16 * 1024];
     if (sfo_size < 16)
     {
-        fatal("ERROR: sfo information is too small\n");
+        sys_error("ERROR: sfo information is too small\n");
     }
     if (sfo_size > sizeof(sfo))
     {
-        fatal("ERROR: sfo information is too big, pkg file is probably corrupted\n");
+        sys_error("ERROR: sfo information is too big, pkg file is probably corrupted\n");
     }
     sys_read(f, sfo_offset, sfo, sfo_size);
 
@@ -200,7 +199,7 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
         if (pkg_size < enc_offset + name_offset + name_size ||
             pkg_size < enc_offset + data_offset + data_size)
         {
-            fatal("ERROR: pkg file is too short, possibly corrupted\n");
+            sys_error("ERROR: pkg file is too short, possibly corrupted\n");
         }
 
         const aes128_key* item_key = psp_type == 0x90 ? key : ps3_key;
@@ -215,11 +214,11 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
             uint8_t sfo[16 * 1024];
             if (data_size < 16)
             {
-                fatal("ERROR: sfo information is too small\n");
+                sys_error("ERROR: sfo information is too small\n");
             }
             if (data_size > sizeof(sfo))
             {
-                fatal("ERROR: sfo information is too big, pkg file is probably corrupted\n");
+                sys_error("ERROR: sfo information is too big, pkg file is probably corrupted\n");
             }
 
             sys_read(pkg, enc_offset + data_offset, sfo, (uint32_t)data_size);
@@ -272,7 +271,8 @@ typedef enum {
 
 int main(int argc, char* argv[])
 {
-    printf("pkg2zip v1.8\n");
+    sys_output_init();
+    sys_output("pkg2zip v1.8\n");
 
     int zipped = 1;
     int cso = 5;
@@ -309,10 +309,10 @@ int main(int argc, char* argv[])
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        fatal("Usage: %s [-x] [-c[N]] file.pkg [zRIF]\n", argv[0]);
+        sys_error("Usage: %s [-x] [-c[N]] file.pkg [zRIF]\n", argv[0]);
     }
 
-    printf("[*] loading...\n");
+    sys_output("[*] loading...\n");
 
     uint64_t pkg_size;
     sys_file pkg = sys_open(pkg_arg, &pkg_size);
@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
 
     if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
     {
-        fatal("ERROR: not a pkg file\n");
+        sys_error("ERROR: not a pkg file\n");
     }
 
     // http://www.psdevwiki.com/ps3/PKG_files
@@ -337,11 +337,11 @@ int main(int argc, char* argv[])
 
     if (pkg_size < total_size)
     {
-        fatal("ERROR: pkg file is too small\n");
+        sys_error("ERROR: pkg file is too small\n");
     }
     if (pkg_size < enc_offset + item_count * 32)
     {
-        fatal("ERROR: pkg file is too small\n");
+        sys_error("ERROR: pkg file is too small\n");
     }
 
     uint32_t content_type = 0;
@@ -402,7 +402,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        fatal("ERROR: unsupported content type 0x%x", content_type);
+        sys_error("ERROR: unsupported content type 0x%x", content_type);
     }
 
     aes128_key ps3_key;
@@ -476,7 +476,7 @@ int main(int argc, char* argv[])
             const char* rif_contentid = (char*)rif + (type == PKG_TYPE_VITA_PSM ? 0x50 : 0x10);
             if (strncmp(rif_contentid, content, 0x30) != 0)
             {
-                fatal("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
+                sys_error("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
             }
         }
     }
@@ -496,42 +496,42 @@ int main(int argc, char* argv[])
             type_str = content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
         }
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
-        printf("[*] unpacking %s\n", type_str);
+        sys_output("[*] unpacking %s\n", type_str);
     }
     else if (type == PKG_TYPE_PSX)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
-        printf("[*] unpacking PSX\n");
+        sys_output("[*] unpacking PSX\n");
     }
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
-        printf("[*] unpacking DLC\n");
+        sys_output("[*] unpacking DLC\n");
     }
     else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
-        printf("[*] unpacking PATCH\n");
+        sys_output("[*] unpacking PATCH\n");
     }
     else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s]%s", id, get_region(id), ext);
-        printf("[*] unpacking PSM\n");
+        sys_output("[*] unpacking PSM\n");
     }
     else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        printf("[*] unpacking APP\n");
+        sys_output("[*] unpacking APP\n");
     }
     else
     {
         assert(0);
-        fatal("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type\n");
     }
 
     if (zipped)
     {
-        printf("[*] creating '%s' archive\n", root);
+        sys_output("[*] creating '%s' archive\n", root);
     }
 
     out_begin(root, zipped);
@@ -603,10 +603,10 @@ int main(int argc, char* argv[])
     else
     {
         assert(0);
-        fatal("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type\n");
     }
 
-    printf("[*] decrypting...\n");
+    sys_output("[*] decrypting...\n");
     char path[1024];
 
     int sce_sys_package_created = 0;
@@ -631,12 +631,12 @@ int main(int argc, char* argv[])
         if (pkg_size < enc_offset + name_offset + name_size ||
             pkg_size < enc_offset + data_offset + data_size)
         {
-            fatal("ERROR: pkg file is too short, possibly corrupted\n");
+            sys_error("ERROR: pkg file is too short, possibly corrupted\n");
         }
 
         if (name_size >= ZIP_MAX_FILENAME)
         {
-            fatal("ERROR: pkg file contains file with very long name\n");
+            sys_error("ERROR: pkg file contains file with very long name\n");
         }
 
         const aes128_key* item_key;
@@ -654,7 +654,7 @@ int main(int argc, char* argv[])
         aes128_ctr_xor(item_key, iv, name_offset / 16, (uint8_t*)name, name_size);
         name[name_size] = 0;
 
-        printf("[%u/%u] %s\n", item_index + 1, item_count, name);
+        sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
 
         if (flags == 4 || flags == 18)
         {
@@ -770,12 +770,12 @@ int main(int argc, char* argv[])
     {
         if (!sce_sys_package_created)
         {
-            printf("[*] creating sce_sys/package\n");
+            sys_output("[*] creating sce_sys/package\n");
             snprintf(path, sizeof(path), "%s/sce_sys/package", root);
             out_add_folder(path);
         }
 
-        printf("[*] creating sce_sys/package/head.bin\n");
+        sys_output("[*] creating sce_sys/package/head.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
 
         out_begin_file(path, 0);
@@ -792,7 +792,7 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        printf("[*] creating sce_sys/package/tail.bin\n");
+        sys_output("[*] creating sce_sys/package/tail.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
         out_begin_file(path, 0);
@@ -807,7 +807,7 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        printf("[*] creating sce_sys/package/stat.bin\n");
+        sys_output("[*] creating sce_sys/package/stat.bin\n");
         snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
@@ -820,16 +820,16 @@ int main(int argc, char* argv[])
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
-            printf("[*] creating RO/License\n");
+            sys_output("[*] creating RO/License\n");
             snprintf(path, sizeof(path), "%s/RO/License", root);
             out_add_folder(path);
 
-            printf("[*] creating RO/License/FAKE.rif\n");
+            sys_output("[*] creating RO/License/FAKE.rif\n");
             snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
         }
         else
         {
-            printf("[*] creating sce_sys/package/work.bin\n");
+            sys_output("[*] creating sce_sys/package/work.bin\n");
             snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
         }
 
@@ -840,29 +840,29 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_VITA_PSM)
     {
-        printf("[*] creating RW\n");
+        sys_output("[*] creating RW\n");
         snprintf(path, sizeof(path), "%s/RW", root);
         out_add_folder(path);
 
-        printf("[*] creating RW/Documents\n");
+        sys_output("[*] creating RW/Documents\n");
         snprintf(path, sizeof(path), "%s/RW/Documents", root);
         out_add_folder(path);
 
-        printf("[*] creating RW/Temp\n");
+        sys_output("[*] creating RW/Temp\n");
         snprintf(path, sizeof(path), "%s/RW/Temp", root);
         out_add_folder(path);
 
-        printf("[*] creating RW/System\n");
+        sys_output("[*] creating RW/System\n");
         snprintf(path, sizeof(path), "%s/RW/System", root);
         out_add_folder(path);
 
-        printf("[*] creating RW/System/content_id\n");
+        sys_output("[*] creating RW/System/content_id\n");
         snprintf(path, sizeof(path), "%s/RW/System/content_id", root);
         out_begin_file(path, 0);
         out_write(pkg_header + 0x30, 0x30);
         out_end_file();
 
-        printf("[*] creating RW/System/pm.dat\n");
+        sys_output("[*] creating RW/System/pm.dat\n");
         snprintf(path, sizeof(path), "%s/RW/System/pm.dat", root);
 
         uint8_t pm[1 << 16] = { 0 };
@@ -875,8 +875,8 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
     {
-        printf("[*] minimum fw version required: %s\n", min_version);
+        sys_output("[*] minimum fw version required: %s\n", min_version);
     }
 
-    printf("[*] done!\n");
+    sys_output("[*] done!\n");
 }

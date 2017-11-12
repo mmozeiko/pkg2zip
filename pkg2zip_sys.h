@@ -1,7 +1,11 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include "pkg2zip_utils.h"
+
+// correctly outputs utf8 string
+void sys_output_init(void);
+void sys_output(const char* msg, ...);
+void NORETURN sys_error(const char* msg, ...);
 
 typedef void* sys_file;
 

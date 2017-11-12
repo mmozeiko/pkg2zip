@@ -1,5 +1,6 @@
 #include "pkg2zip_zrif.h"
 #include "pkg2zip_utils.h"
+#include "pkg2zip_sys.h"
 #include "miniz_tdef.h"
 #include "puff.h"
 
@@ -106,17 +107,17 @@ static uint32_t zlib_inflate(const uint8_t* in, uint32_t inlen, uint8_t* out, ui
 {
     if (inlen < 2 + 4)
     {
-        fatal("ERROR: zRIF length too short\n");
+        sys_error("ERROR: zRIF length too short\n");
     }
 
     if (((in[0] << 8) + in[1]) % 31 != 0)
     {
-        fatal("ERROR: zRIF header is corrupted\n");
+        sys_error("ERROR: zRIF header is corrupted\n");
     }
 
     if ((in[0] & 0xf) != ZLIB_DEFLATE_METHOD)
     {
-        fatal("ERROR: only deflate method supported in zRIF\n");
+        sys_error("ERROR: only deflate method supported in zRIF\n");
     }
 
     unsigned long slen = inlen - 4;
@@ -132,7 +133,7 @@ static uint32_t zlib_inflate(const uint8_t* in, uint32_t inlen, uint8_t* out, ui
 
         if (get32be(in + 2) != ZLIB_DICTIONARY_ID_ZRIF)
         {
-            fatal("ERROR: zRIF uses unknown dictionary\n");
+            sys_error("ERROR: zRIF uses unknown dictionary\n");
         }
 
         in += 6;
@@ -146,13 +147,13 @@ static uint32_t zlib_inflate(const uint8_t* in, uint32_t inlen, uint8_t* out, ui
 
     if (puff(dictlen, out, &dlen, in, &slen) != 0)
     {
-        fatal("ERROR: failed to uncompress zRIF\n");
+        sys_error("ERROR: failed to uncompress zRIF\n");
     }
     memmove(out, out + dictlen, dlen);
 
     if (mz_adler32(MZ_ADLER32_INIT, out, dlen) != get32be(in + slen))
     {
-        fatal("ERROR: zRIF is corrupted, wrong checksum\n");
+        sys_error("ERROR: zRIF is corrupted, wrong checksum\n");
     }
 
     return dlen;
@@ -167,7 +168,7 @@ void zrif_decode(const char* str, uint8_t* rif, uint32_t rif_size)
     len = zlib_inflate(raw, len, out, sizeof(out));
     if (len != rif_size)
     {
-        fatal("ERROR: wrong size of zRIF, is it corrupted?\n");
+        sys_error("ERROR: wrong size of zRIF, is it corrupted?\n");
     }
 
     memcpy(rif, out, rif_size);

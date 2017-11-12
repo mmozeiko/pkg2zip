@@ -4,6 +4,7 @@
 #endif
 
 #include "pkg2zip_zip.h"
+#include "pkg2zip_out.h"
 #include "pkg2zip_crc32.h"
 #include "pkg2zip_utils.h"
 
@@ -73,7 +74,7 @@ void zip_add_folder(zip* z, const char* name)
     size_t name_length = strlen(name) + 1;
     if (name_length > ZIP_MAX_FILENAME)
     {
-        fatal("ERROR: dirname too long\n");
+        sys_error("ERROR: dirname too long\n");
     }
 
     zip_file* f = zip_new_file(z);
@@ -113,7 +114,7 @@ uint64_t zip_begin_file(zip* z, const char* name, int compress)
     size_t name_length = strlen(name);
     if (name_length > ZIP_MAX_FILENAME)
     {
-        fatal("ERROR: filename too long\n");
+        sys_error("ERROR: filename too long\n");
     }
 
     zip_file* f = zip_new_file(z);
@@ -411,7 +412,7 @@ void zip_write_file_at(zip* z, uint64_t offset, const void* data, uint32_t size)
 {
     if (z->current->compress)
     {
-        fatal("ERROR: cannot write at specific offset for compressed files\n");
+        sys_error("ERROR: cannot write at specific offset for compressed files\n");
     }
 
     sys_write(z->file, z->current->offset + offset, data, size);
