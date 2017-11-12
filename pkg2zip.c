@@ -275,7 +275,7 @@ int main(int argc, char* argv[])
     sys_output("pkg2zip v1.8\n");
 
     int zipped = 1;
-    int cso = 5;
+    int cso = 0;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
