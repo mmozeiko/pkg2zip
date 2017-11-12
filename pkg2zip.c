@@ -542,7 +542,7 @@ int main(int argc, char* argv[])
         snprintf(root, sizeof(root), "pspemu/ISO");
         out_add_folder(root);
 
-        if (strcmp(category, "HG") == 0)
+        if (content_type == 7 && strcmp(category, "HG") == 0)
         {
             snprintf(root, sizeof(root), "pspemu/GAME");
             out_add_folder(root);
