@@ -38,7 +38,7 @@ void sys_output(const char* msg, ...)
         int wcount = MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, sizeof(buffer));
 
         DWORD written;
-        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wbuffer, wcount, &written, NULL);
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wbuffer, wcount - 1, &written, NULL);
         return;
     }
     fputs(buffer, stdout);
@@ -161,8 +161,11 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 #include <unistd.h>
 #include <sys/stat.h>
 
+static int gStdoutRedirected;
+
 void sys_output_init(void)
 {
+    gStdoutRedirected = !isatty(STDOUT_FILENO);
 }
 
 void sys_output(const char* msg, ...)
@@ -302,4 +305,28 @@ void sys_vstrncat(char* dst, size_t n, const char* format, ...)
     va_end(args);
 
     strncat(dst, temp, n - strlen(dst) - 1);
+}
+
+static uint64_t out_size;
+static uint32_t out_next;
+
+void sys_output_progress_init(uint64_t size)
+{
+    out_size = size;
+    out_next = 0;
+}
+
+void sys_output_progress(uint64_t progress)
+{
+    if (gStdoutRedirected)
+    {
+        return;
+    }
+
+    uint32_t now = (uint32_t)(progress * 100 / out_size);
+    if (now >= out_next)
+    {
+        sys_output("[*] unpacking... %u%%\r", now);
+        out_next = now + 1;
+    }
 }

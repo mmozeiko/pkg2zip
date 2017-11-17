@@ -7,6 +7,9 @@ void sys_output_init(void);
 void sys_output(const char* msg, ...);
 void NORETURN sys_error(const char* msg, ...);
 
+void sys_output_progress_init(uint64_t size);
+void sys_output_progress(uint64_t progress);
+
 typedef void* sys_file;
 
 void sys_mkdir(const char* path);

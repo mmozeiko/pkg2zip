@@ -417,6 +417,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
         uint8_t PKG_ALIGN(16) data[16 * ISO_SECTOR_SIZE];
 
         uint64_t abs_offset = item_offset + psar_offset + block_offset;
+        sys_output_progress(enc_offset + abs_offset);
         sys_read(pkg, enc_offset + abs_offset, data, block_size);
         aes128_ctr_xor(pkg_key, pkg_iv, abs_offset / 16, data, block_size);
 

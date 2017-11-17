@@ -506,22 +506,22 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
-        sys_output("[*] unpacking DLC\n");
+        sys_output("[*] unpacking Vita DLC\n");
     }
     else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
-        sys_output("[*] unpacking PATCH\n");
+        sys_output("[*] unpacking Vita PATCH\n");
     }
     else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s]%s", id, get_region(id), ext);
-        sys_output("[*] unpacking PSM\n");
+        sys_output("[*] unpacking Vita PSM\n");
     }
     else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        sys_output("[*] unpacking APP\n");
+        sys_output("[*] unpacking Vita APP\n");
     }
     else
     {
@@ -606,10 +606,11 @@ int main(int argc, char* argv[])
         sys_error("ERROR: unsupported type\n");
     }
 
-    sys_output("[*] decrypting...\n");
     char path[1024];
 
     int sce_sys_package_created = 0;
+
+    sys_output_progress_init(pkg_size);
 
     for (uint32_t item_index = 0; item_index < item_count; item_index++)
     {
@@ -654,7 +655,7 @@ int main(int argc, char* argv[])
         aes128_ctr_xor(item_key, iv, name_offset / 16, (uint8_t*)name, name_size);
         name[name_size] = 0;
 
-        sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
+        // sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
 
         if (flags == 4 || flags == 18)
         {
@@ -751,6 +752,7 @@ int main(int argc, char* argv[])
             {
                 uint8_t PKG_ALIGN(16) buffer[1 << 16];
                 uint32_t size = (uint32_t)min64(data_size, sizeof(buffer));
+                sys_output_progress(enc_offset + offset);
                 sys_read(pkg, enc_offset + offset, buffer, size);
 
                 if (decrypt)
@@ -765,6 +767,8 @@ int main(int argc, char* argv[])
             out_end_file();
         }
     }
+
+    sys_output("[*] unpacking completed\n");
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
     {
