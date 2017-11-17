@@ -515,7 +515,7 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_VITA_PSM)
     {
-        snprintf(root, sizeof(root), "%.9s [%s]%s", id, get_region(id), ext);
+        snprintf(root, sizeof(root), "%.9s [%s] [PSM]%s", id, get_region(id), ext);
         sys_output("[*] unpacking Vita PSM\n");
     }
     else if (type == PKG_TYPE_VITA_APP)
