@@ -544,7 +544,13 @@ int main(int argc, char* argv[])
 
         if (content_type == 7 && strcmp(category, "HG") == 0)
         {
-            snprintf(root, sizeof(root), "pspemu/GAME");
+            snprintf(root, sizeof(root), "pspemu");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/PSP");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/GAME");
             out_add_folder(root);
 
             sys_vstrncat(root, sizeof(root), "/%.9s", id);
@@ -722,13 +728,13 @@ int main(int argc, char* argv[])
                 }
                 else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/GAME/%.9s/PSP-KEY.EDAT", id);
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/PSP-KEY.EDAT", id);
                     unpack_psp_key(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
                     continue;
                 }
                 else if (strcmp("USRDIR/CONTENT/CONTENT.DAT", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/GAME/%.9s/CONTENT.DAT", id);
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/CONTENT.DAT", id);
                 }
                 else
                 {
