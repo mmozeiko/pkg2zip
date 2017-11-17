@@ -2,7 +2,7 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Supports also PSX files for use with [Adrenaline][].
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
 
 Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string. You must provide license key.
 
@@ -12,7 +12,7 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * [NoNpDrm][]
 * [NoPsmDrm][] for PSM titles
 * [VitaShell][] **v1.76** or newer required for DLC installation
-* [Adrenaline][] for PSX titles
+* [Adrenaline][] for PSX or PSP titles
 
 # Features
 
@@ -21,12 +21,12 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **Vita DLC**, **Vita PATCH** and **PSM** pkg unpacking.
-* **PSX** pkg unpacking.
+* **PSX** and **PSP** pkg unpacking.
 
 Limitations:
 
-* currently no PSP or PSP Mini pkg files are supported.
-* currently no actual title name is extracted for PSM pkg files.
+* no PSP DLC pkg files are supported.
+* no actual title name is extracted for PSM pkg files.
 
 # Usage
 
@@ -46,7 +46,19 @@ To avoid zipping process and create individual files, use `-x` argument (must co
 
     pkg2zip -x package.pkg [zRIF_STRING]
 
-PSX pkg files do not require zRIF argument. It will be ignored.
+PSX or PSP pkg files do not require zRIF argument. It will be ignored.
+
+For PSP files pkg2zip by default will create .ISO file. To create compressed .CSO file pass -cN argument where N is compression factor. For example, for fastest compression use:
+
+    pkg2zip -c1 package.pkg
+
+To create smaller cso file (more compression will require more time) use -c9, or anything inbetween:
+
+    pkg2zip -c9 package.pkg
+
+You can combine -cN argument together with -x:
+
+    pkg2zip -x -c9 package.pkg
 
 # Generating zRIF string
 
