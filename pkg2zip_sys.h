@@ -4,6 +4,7 @@
 
 // correctly outputs utf8 string
 void sys_output_init(void);
+void sys_output_done(void);
 void sys_output(const char* msg, ...);
 void NORETURN sys_error(const char* msg, ...);
 

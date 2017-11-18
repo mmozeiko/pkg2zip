@@ -889,4 +889,5 @@ int main(int argc, char* argv[])
     }
 
     sys_output("[*] done!\n");
+    sys_output_done();
 }

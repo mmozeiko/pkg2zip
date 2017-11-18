@@ -13,14 +13,21 @@
 
 static HANDLE gStdout;
 static int gStdoutRedirected;
+static UINT gOldCP;
 
 void sys_output_init(void)
 {
+    gOldCP = GetConsoleOutputCP();
     SetConsoleOutputCP(CP_UTF8);
     gStdout = GetStdHandle(STD_OUTPUT_HANDLE);
 
     DWORD mode;
     gStdoutRedirected = !GetConsoleMode(gStdout, &mode);
+}
+
+void sys_output_done(void)
+{
+    SetConsoleOutputCP(gOldCP);
 }
 
 void sys_output(const char* msg, ...)
@@ -60,12 +67,14 @@ void sys_error(const char* msg, ...)
         int wcount = MultiByteToWideChar(CP_UTF8, 0, buffer, -1, wbuffer, sizeof(buffer));
 
         DWORD written;
-        WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wbuffer, wcount, &written, NULL);
-
-        exit(EXIT_FAILURE);
+        WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wbuffer, wcount - 1, &written, NULL);
     }
-    fputs(buffer, stderr);
+    else
+    {
+        fputs(buffer, stderr);
+    }
 
+    SetConsoleOutputCP(gOldCP);
     exit(EXIT_FAILURE);
 }
 
@@ -166,6 +175,10 @@ static int gStdoutRedirected;
 void sys_output_init(void)
 {
     gStdoutRedirected = !isatty(STDOUT_FILENO);
+}
+
+void sys_output_done(void)
+{
 }
 
 void sys_output(const char* msg, ...)
