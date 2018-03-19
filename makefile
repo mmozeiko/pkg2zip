@@ -6,7 +6,7 @@ else
 endif
 
 BIN=pkg2zip${EXE}
-SRC=${wildcard pkg2zip*.c} miniz_tdef.c puff.c
+SRC=${wildcard pkg2zip*.c} miniz_tdef.c puff.c pdb.c
 OBJ=${SRC:.c=.o}
 DEP=${SRC:.c=.d}
 
