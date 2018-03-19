@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 // http://www.psdevwiki.com/ps3/Project_Database_(PDB)
 
@@ -23,10 +24,31 @@ static const unsigned char pdb_04_theme[] = {232, 0, 0, 0, 120, 0, 0, 0, 120, 0,
 unsigned int pdb_len_theme_05 = 133;
 static const unsigned char pdb_05_theme[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 205, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 236, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 199, 8, 120, 149, 237, 0, 0, 0, 32, 0, 0, 0, 32, 0, 0, 0, 191, 31, 176, 182, 101, 19, 244, 6, 161, 144, 115, 57, 24, 86, 53, 208, 34, 131, 37, 93, 67, 148, 147, 158, 117, 166, 119, 106, 126, 3, 133, 198};
 
+int size_t2int(size_t val)
+{
+    return (val <= INT_MAX) ? (int)((size_t)val) : -1;
+}
+
+int check_dir(const char *directory_path) // needed in pkg2zip.c...
+{
+	struct stat info;
+	if (stat(directory_path, &info) != 0)
+	{
+		return -1;
+	}
+	else if (info.st_mode & S_IFDIR)
+	{
+		return 0;
+	}
+	else
+	{
+		return -2;
+	}
+}
 
 static uint8_t *putStringParam(uint8_t *buffer, uint32_t code, const char *string) {
     //Include terminating zero char
-    uint32_t len = strlen(string) + 1;
+    uint32_t len = size_t2int(strlen(string) + 1);
     *((uint32_t *) buffer) = code;
     buffer += sizeof(uint32_t);
     *((uint32_t *) buffer) = len;
@@ -39,12 +61,16 @@ static uint8_t *putStringParam(uint8_t *buffer, uint32_t code, const char *strin
 
 size_t writeFile(const char *path, const uint8_t *buf, const uint32_t length) {
     FILE *out = fopen(path, "wb");
-    if (out) {
-        if (length > 0) {
+    if (out)
+	{
+        if (length > 0)
+		{
             size_t written = fwrite(buf, sizeof(uint8_t), length, out);
             fclose(out);
             return written;
-        } else {
+        }
+		else
+		{
             fclose(out);
             return 1;
         }
@@ -61,15 +87,15 @@ uint32_t pkgdbGenerate(uint8_t *buffer, uint32_t length, char *title, char *titl
 	if (!contentid) contentid = "EP9000-PCSF00688_00-P000000000002912";
 	// it's wrong by a few bytes... (doesn't really matter...)
     uint32_t total = pdb_len_theme_01 +
-                     13 + strlen(title) +
-                     13 + strlen(pkg_name) +
-                     13 + strlen(pkg_url) +
+                     13 + size_t2int(strlen(title)) +
+                     13 + size_t2int(strlen(pkg_name)) +
+                     13 + size_t2int(strlen(pkg_url)) +
                      13 + 0x1D + //For icon path
-					 13 + strlen(contentid) +
+					 13 + size_t2int(strlen(contentid)) +
                      pdb_len_theme_02 +
-					 13 + strlen(titleid) +
+					 13 + size_t2int(strlen(titleid)) +
 					 pdb_len_theme_03 +
-					 13 + strlen(contentid) +
+					 13 + size_t2int(strlen(contentid)) +
 					 pdb_len_theme_04 + pdb_len_theme_05;
 	// printf("\nThe calculated size is %lu", total);
 	if (total < length) {
@@ -110,7 +136,7 @@ uint32_t pkgdbGenerate(uint8_t *buffer, uint32_t length, char *title, char *titl
 
 		memcpy(buffer, pdb_05_theme, pdb_len_theme_05);
 		buffer += pdb_len_theme_05;
-        return buffer - start;
+        return size_t2int(buffer - start);
     }
     return 0;
 }
