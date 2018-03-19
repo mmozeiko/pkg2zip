@@ -4,12 +4,16 @@
 #include "pkg2zip_psp.h"
 #include "pkg2zip_utils.h"
 #include "pkg2zip_zrif.h"
+#include "pdb.h"
 
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <dirent.h>
+#include <errno.h>
+#include <stddef.h>
 
 #define PKG_HEADER_SIZE 192
 #define PKG_HEADER_EXT_SIZE 64
@@ -20,6 +24,8 @@ static const uint8_t pkg_psp_key[] = { 0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d,
 static const uint8_t pkg_vita_2[] = { 0xe3, 0x1a, 0x70, 0xc9, 0xce, 0x1d, 0xd7, 0x2b, 0xf3, 0xc0, 0x62, 0x29, 0x63, 0xf2, 0xec, 0xcb };
 static const uint8_t pkg_vita_3[] = { 0x42, 0x3a, 0xca, 0x3a, 0x2b, 0xd5, 0x64, 0x9f, 0x96, 0x86, 0xab, 0xad, 0x6f, 0xd8, 0x80, 0x1f };
 static const uint8_t pkg_vita_4[] = { 0xaf, 0x07, 0xfd, 0x59, 0x65, 0x25, 0x27, 0xba, 0xf1, 0x33, 0x89, 0x66, 0x8b, 0x17, 0xd9, 0xea };
+// used as identifier for pdb creation of themes
+int next_dir = 1;
 
 // http://vitadevwiki.com/vita/System_File_Object_(SFO)_(PSF)#Internal_Structure
 // https://github.com/TheOfficialFloW/VitaShell/blob/1.74/sfo.h#L29
@@ -260,19 +266,43 @@ static const char* get_region(const char* id)
     }
 }
 
+int check_dir(char *directory_path)
+{
+	DIR* dir = opendir(directory_path);
+	if (dir)
+	{
+		/* Directory exists. */
+		closedir(dir);
+		return 0;
+	}
+	else if (ENOENT == errno)
+	{
+		/* Directory does not exist. */
+		return -1;
+	}
+	else
+	{
+	/* opendir() failed for some other reason. */
+	return -2;
+	}
+}
+
+
 typedef enum {
     PKG_TYPE_VITA_APP,
     PKG_TYPE_VITA_DLC,
     PKG_TYPE_VITA_PATCH,
+	PKG_TYPE_VITA_THEME,
     PKG_TYPE_VITA_PSM,
     PKG_TYPE_PSP,
     PKG_TYPE_PSX,
 } pkg_type;
 
+
 int main(int argc, char* argv[])
 {
     sys_output_init();
-    sys_output("pkg2zip v1.8\n");
+    sys_output("pkg2zip v1.9\n");
 
     int zipped = 1;
     int cso = 0;
@@ -400,6 +430,10 @@ int main(int argc, char* argv[])
     {
         type = PKG_TYPE_VITA_PSM;
     }
+	else if (content_type == 0x1f)
+	{
+		type = PKG_TYPE_VITA_THEME;
+	}
     else
     {
         sys_error("ERROR: unsupported content type 0x%x", content_type);
@@ -459,7 +493,7 @@ int main(int argc, char* argv[])
             memcpy(content, pkg_header + 0x30, 0x30);
             rif_size = 1024;
         }
-        else // Vita APP, DLC or PATCH
+        else // Vita APP, DLC, PATCH or THEME
         {
             parse_sfo(pkg, sfo_offset, sfo_size, category, title, content, min_version, pkg_version);
             rif_size = 512;
@@ -523,6 +557,11 @@ int main(int argc, char* argv[])
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
         sys_output("[*] unpacking Vita APP\n");
     }
+	else if (type == PKG_TYPE_VITA_THEME)
+	{
+		snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
+		sys_output("[*] unpacking Vita Theme\n");
+	}
     else
     {
         assert(0);
@@ -606,6 +645,40 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
     }
+	else if (type == PKG_TYPE_VITA_THEME)
+	{
+		sys_vstrncat(root, sizeof(root), "bgdl");
+		out_add_folder(root);
+		
+		sys_vstrncat(root, sizeof(root), "/t");
+		out_add_folder(root);
+
+        char *temp = malloc(1024);
+		char *temp2 = malloc(1024);
+		strncpy(temp, root, 1024);
+		strncat(temp, "/", 1024);
+		int outputdir = 0;
+		do 
+		{
+			snprintf(temp, 1024, "%s%s%08d%s", root, "/", next_dir, "/");
+			snprintf(temp2, 1024, "%s%08d", "/", next_dir);
+			int ret = check_dir(temp);
+			if (ret == -1)
+			{
+				sys_vstrncat(root, sizeof(root), temp2);
+				out_add_folder(root);
+				sys_vstrncat(root, sizeof(root), "/%.9s", id);
+				out_add_folder(root);
+
+				break;
+			}
+			else
+			{
+				next_dir++;
+			}
+		}
+		while(outputdir == 0);
+	}
     else
     {
         assert(0);
@@ -675,7 +748,7 @@ int main(int argc, char* argv[])
                     out_add_folder(path);
                 }
             }
-            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
             {
                 snprintf(path, sizeof(path), "%s/%s", root, name);
                 out_add_folder(path);
@@ -689,7 +762,7 @@ int main(int argc, char* argv[])
         else
         {
             int decrypt = 1;
-            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH) && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME) && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
                 // TODO: is this really needed?
                 if (!sce_sys_package_created)
@@ -776,7 +849,7 @@ int main(int argc, char* argv[])
 
     sys_output("[*] unpacking completed\n");
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
     {
         if (!sce_sys_package_created)
         {
@@ -826,7 +899,7 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM) && zrif_arg != NULL)
+    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM || type == PKG_TYPE_VITA_THEME) && zrif_arg != NULL)
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
@@ -837,6 +910,16 @@ int main(int argc, char* argv[])
             sys_output("[*] creating RO/License/FAKE.rif\n");
             snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
         }
+		else if (type == PKG_TYPE_VITA_THEME)
+		{
+			sys_output("[*] creating temp.dat\n");
+			snprintf(path, sizeof(path), "%.16s/temp.dat", root);
+			// is this needed ?:
+			
+			sys_output("[*] creating sce_sys/package/work.bin\n");
+            snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
+
+		}
         else
         {
             sys_output("[*] creating sce_sys/package/work.bin\n");
@@ -880,11 +963,38 @@ int main(int argc, char* argv[])
         out_write(pm, sizeof(pm));
         out_end_file();
     }
+	else if (type == PKG_TYPE_VITA_THEME)
+	{
+		// create a variable containing the titleid
+		char *titleid = malloc(0x30);
+		snprintf(titleid, 17, "%.16s\n", content);
+		titleid += 7;
+		// get pdb data
+		sys_output("[*] generating pdb files\n");
+		uint8_t *pkgdb = malloc(0x2000);
+
+		uint32_t dblen = pkgdbGenerate(pkgdb, 0x2000, title, titleid, content, 
+										pkg_arg, // PKG Name
+										NULL, // PKG Url
+										next_dir); // here is the id example bgdl/t/00000009/ and the id would be bgdl/t/0000000id/
+		// write it to files:
+		char *pdb0 = malloc(0x25);
+		char *pdb1 = malloc(0x25);
+		char *f0 = malloc(0x25);
+		snprintf(pdb0, 25, "%.16s/d0.pdb", root);
+		snprintf(pdb1, 25, "%.16s/d1.pdb", root);
+		snprintf(f0, 25, "%.16s/f0.pdb", root);
+		writeFile(pdb0, pkgdb, dblen);
+		pkgdb[0x20] = 0;
+		writeFile(pdb1, pkgdb, dblen);
+		writeFile(f0, NULL, 0);
+	}
 
     out_end();
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
     {
+		// on some themes there is no fw requirement ?! (stitching theme for example...)
         sys_output("[*] minimum fw version required: %s\n", min_version);
     }
 
