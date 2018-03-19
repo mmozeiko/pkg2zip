@@ -22,11 +22,13 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **Vita DLC**, **Vita PATCH** and **PSM** pkg unpacking.
 * **PSX** and **PSP** pkg unpacking.
+* **Vita THEME**
 
 Limitations:
 
 * no PSP DLC pkg files are supported.
 * no actual title name is extracted for PSM pkg files.
+* themes are installed via PDB files (you have to reboot every 32 themes if you want to install more than 32 at once).
 
 # Usage
 
