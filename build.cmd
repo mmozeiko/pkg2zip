@@ -10,4 +10,5 @@ set CL=%CL% /Ox
 rem set CL=%CL% /Od /Zi
 rem set LINK=%LINK% /DEBUG
 
-cl.exe pkg2zip*.c miniz_tdef.c puff.c /Fepkg2zip.exe
+cl.exe pkg2zip*.c miniz_tdef.c puff.c pdb.c /Fepkg2zip.exe
+pause
