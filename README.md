@@ -82,6 +82,11 @@ ArchLinux users can build binary with [pkg2zip][AUR] package in AUR repository. 
 
     $ pacaur -S pkg2zip
 
+openSUSE users can download the package from the [Packman](http://packman.links2linux.de/package/pkg2zip) repository.
+If this repository is enabled, just install pkg2zip with zypper.
+
+    # zypper install pkg2zip
+
 # Building
 
 Execute `make` if you are on GNU/Linux or macOS.
