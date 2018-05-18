@@ -272,9 +272,9 @@ typedef enum {
 int main(int argc, char* argv[])
 {
     sys_output_init();
-    sys_output("pkg2zip v1.8\n");
 
     int zipped = 1;
+    int listing = 0;
     int cso = 0;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
@@ -283,6 +283,10 @@ int main(int argc, char* argv[])
         if (strcmp(argv[i], "-x") == 0)
         {
             zipped = 0;
+        }
+        else if (strcmp(argv[i], "-l") == 0)
+        {
+            listing = 1;
         }
         else if (strncmp(argv[i], "-c", 2) == 0)
         {
@@ -305,14 +309,20 @@ int main(int argc, char* argv[])
             }
         }
     }
-
+    if (listing == 0)
+    {
+        sys_output("pkg2zip v1.8\n");
+    }
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        sys_error("Usage: %s [-x] [-c[N]] file.pkg [zRIF]\n", argv[0]);
+        sys_error("Usage: %s [-x] [-l] [-c[N]] file.pkg [zRIF]\n", argv[0]);
     }
 
-    sys_output("[*] loading...\n");
+    if (listing == 0)
+    {
+        sys_output("[*] loading...\n");
+    }
 
     uint64_t pkg_size;
     sys_file pkg = sys_open(pkg_arg, &pkg_size);
@@ -496,37 +506,65 @@ int main(int argc, char* argv[])
             type_str = content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
         }
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
-        sys_output("[*] unpacking %s\n", type_str);
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking %s\n", type_str);
+        }
     }
     else if (type == PKG_TYPE_PSX)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
-        sys_output("[*] unpacking PSX\n");
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking PSX\n");
+        }
     }
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
-        sys_output("[*] unpacking Vita DLC\n");
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking Vita DLC\n");
+        }
     }
     else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
-        sys_output("[*] unpacking Vita PATCH\n");
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking Vita PATCH\n");
+        }
     }
     else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s] [PSM]%s", id, get_region(id), ext);
-        sys_output("[*] unpacking Vita PSM\n");
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking Vita PSM\n");
+        }
     }
     else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        sys_output("[*] unpacking Vita APP\n");
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking Vita APP\n");
+        }
     }
     else
     {
         assert(0);
         sys_error("ERROR: unsupported type\n");
+    }
+
+    if (listing && zipped)
+    {
+        sys_output("%s\n", root);
+        exit(0);
+    }
+    else if (listing || zipped)
+    {
+        sys_error("ERROR: Listing option without creating zip is useless\n");
     }
 
     if (zipped)
