@@ -562,7 +562,7 @@ int main(int argc, char* argv[])
         sys_output("%s\n", root);
         exit(0);
     }
-    else if (listing || zipped)
+    else if (listing && zipped == 0)
     {
         sys_error("ERROR: Listing option without creating zip is useless\n");
     }
