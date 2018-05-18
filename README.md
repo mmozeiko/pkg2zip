@@ -42,6 +42,10 @@ If you don't have zRIF fake license, but just want to unpack files, then omit la
 
 Resulting zip file will not include work.bin. This is useful for patch pkg files.
 
+To get output file name of the zip, use `-l` (must come before pkg file and cannot be used with `-x`):
+
+    pkg2zip -l package.pkg
+
 To avoid zipping process and create individual files, use `-x` argument (must come before pkg file):
 
     pkg2zip -x package.pkg [zRIF_STRING]
