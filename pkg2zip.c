@@ -11,6 +11,12 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
+
 #define PKG_HEADER_SIZE 192
 #define PKG_HEADER_EXT_SIZE 64
 

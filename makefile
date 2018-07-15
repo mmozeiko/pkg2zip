@@ -10,7 +10,7 @@ SRC=${wildcard pkg2zip*.c} miniz_tdef.c puff.c
 OBJ=${SRC:.c=.o}
 DEP=${SRC:.c=.d}
 
-CFLAGS=-std=c99 -pipe -fvisibility=hidden -Wall -Wextra -Werror -Wno-format-truncation -DNDEBUG -D_GNU_SOURCE -O2
+CFLAGS=-std=c99 -pipe -fvisibility=hidden -Wall -Wextra -Werror -DNDEBUG -D_GNU_SOURCE -O2
 LDFLAGS=-s
 
 .PHONY: all clean
