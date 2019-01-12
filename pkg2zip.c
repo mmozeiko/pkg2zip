@@ -282,6 +282,7 @@ int main(int argc, char* argv[])
     int zipped = 1;
     int listing = 0;
     int cso = 0;
+    int pbp = 0;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
@@ -301,6 +302,10 @@ int main(int argc, char* argv[])
                 cso = atoi(argv[i] + 2);
                 cso = cso > 9 ? 9 : cso < 0 ? 0 : cso;
             }
+        }
+        else if (strcmp(argv[i], "-p") == 0)
+        {
+            pbp = 1;
         }
         else
         {
@@ -600,6 +605,21 @@ int main(int argc, char* argv[])
             sys_vstrncat(root, sizeof(root), "/%.9s", id);
             out_add_folder(root);
         }
+        
+        if (pbp == 1)
+        {
+            snprintf(root, sizeof(root), "pspemu");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/PSP");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/GAME");
+            out_add_folder(root);
+
+            sys_vstrncat(root, sizeof(root), "/%.9s", id);
+            out_add_folder(root);
+        }		
     }
     else if (type == PKG_TYPE_PSX)
     {
@@ -764,7 +784,15 @@ int main(int argc, char* argv[])
             }
             else if (type == PKG_TYPE_PSP)
             {
-                if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
+                if (pbp == 1 && strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCUMENT.DAT", id);
+                }
+                else if (pbp == 1 && strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/EBOOT.PBP", id);
+                }                
+                else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
                     snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
                     unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);

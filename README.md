@@ -64,6 +64,10 @@ You can combine -cN argument together with -x:
 
     pkg2zip -x -c9 package.pkg
 
+To keep PSP files in their original EBOOT.PBP format:
+
+    pkg2zip -p package.pkg
+
 # Generating zRIF string
 
 If you have working NoNpDrm license file (work.bin or 6488b73b912a753a492e2714e9b38bc7.rif) you can create zRIF string with `rif2zrif.py` python script:
