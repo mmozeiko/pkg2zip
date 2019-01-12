@@ -64,7 +64,7 @@ You can combine -cN argument together with -x:
 
     pkg2zip -x -c9 package.pkg
 
-To keep PSP files in their original EBOOT.PBP format:
+To keep PSP files in their original EBOOT.PBP format: 
 
     pkg2zip -p package.pkg
 

@@ -591,7 +591,7 @@ int main(int argc, char* argv[])
         snprintf(root, sizeof(root), "pspemu/ISO");
         out_add_folder(root);
 
-        if (content_type == 7 && strcmp(category, "HG") == 0)
+        if (pbp == 1 || (content_type == 7 && strcmp(category, "HG") == 0))
         {
             snprintf(root, sizeof(root), "pspemu");
             out_add_folder(root);
@@ -605,21 +605,6 @@ int main(int argc, char* argv[])
             sys_vstrncat(root, sizeof(root), "/%.9s", id);
             out_add_folder(root);
         }
-        
-        if (pbp == 1)
-        {
-            snprintf(root, sizeof(root), "pspemu");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/PSP");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/GAME");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/%.9s", id);
-            out_add_folder(root);
-        }		
     }
     else if (type == PKG_TYPE_PSX)
     {
