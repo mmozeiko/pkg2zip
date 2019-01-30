@@ -794,8 +794,35 @@ int main(int argc, char* argv[])
                     snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/CONTENT.DAT", id);
                 }
                 else
-                {
-                    continue;
+                { 
+                    // skip "USRDIR/CONTENT" prefix
+                    char* slash = strchr(name+14, '/');
+                    if (slash != NULL)
+                    {
+                        snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/%s", id, name+15);
+
+                        //create the parent directory
+                        char* lastslash = strrchr(path, '/');
+                        if (lastslash != NULL)
+                        {
+                            snprintf(root, strlen(path)-strlen(lastslash)+1, "%s", path);
+                            out_add_folder(root);
+                        }
+
+                        //Check for EDAT
+                        char* edat = strrchr(name, '.');
+                        if (edat != NULL)
+                        {
+                            if (strcmp(edat, ".edat") == 0 || strcmp(edat, ".EDAT") == 0)
+                            {
+                                // TODO: decrypt something
+                            }
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
             }
             else if (type == PKG_TYPE_VITA_PSM)

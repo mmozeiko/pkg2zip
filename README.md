@@ -13,6 +13,7 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * [NoPsmDrm][] for PSM titles
 * [VitaShell][] **v1.76** or newer required for DLC installation
 * [Adrenaline][] for PSX or PSP titles
+* [nonpdrm_free][] for PSP eboot and PSP DLC content.
 
 # Features
 
@@ -21,11 +22,11 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **Vita DLC**, **Vita PATCH** and **PSM** pkg unpacking.
-* **PSX** and **PSP** pkg unpacking.
+* **PSX**, **PSP**, and **PSP DLC** pkg unpacking.
 
 Limitations:
 
-* no PSP DLC pkg files are supported.
+* PSP DLC pkg files are unpacked, but not decrypted. Requires the nonpdrm_free plugin and the main title to be in EBOOT.PBP format.
 * no actual title name is extracted for PSM pkg files.
 
 # Usage
