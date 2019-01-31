@@ -380,7 +380,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
     if (cso)
     {
         cso_size = block_count * iso_block * ISO_SECTOR_SIZE;
-        cso_compress_flags = tdefl_create_comp_flags_from_zip_params(cso, -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY);
+        cso_compress_flags = tdefl_create_comp_flags_from_zip_params(cso, -MZ_DEFAULT_WINDOW_BITS, MZ_FIXED);
 
         uint32_t cso_block_count = (uint32_t)(1 + (cso_size + ISO_SECTOR_SIZE - 1) / ISO_SECTOR_SIZE);
         cso_block = sys_realloc(NULL, cso_block_count * sizeof(uint32_t));
