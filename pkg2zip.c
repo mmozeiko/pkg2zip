@@ -816,6 +816,8 @@ int main(int argc, char* argv[])
                             if (strcmp(edat, ".edat") == 0 || strcmp(edat, ".EDAT") == 0)
                             {
                                 // TODO: decrypt something
+								unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+								continue;
                             }
                         }
                     }

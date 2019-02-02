@@ -13,7 +13,7 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * [NoPsmDrm][] for PSM titles
 * [VitaShell][] **v1.76** or newer required for DLC installation
 * [Adrenaline][] for PSX or PSP titles
-* [npdrm_free][] for PSP eboot and PSP DLC content.
+* [npdrm_free][] for PSP titles in eboot format.
 
 # Features
 
@@ -26,7 +26,6 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 
 Limitations:
 
-* PSP DLC pkg files are unpacked, but not decrypted. Requires the npdrm_free plugin and the main title to be in EBOOT.PBP format.
 * no actual title name is extracted for PSM pkg files.
 
 # Usage

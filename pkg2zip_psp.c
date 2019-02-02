@@ -584,3 +584,73 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
     out_write(key_header + 0x90, 0x10);
     out_end_file();
 }
+
+void unpack_psp_edat(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+{
+    if (item_size < 0x90 + 0xa0)
+    {
+        sys_error("ERROR: EDAT file is to short!\n");
+    }
+
+    uint8_t item_header[90];
+    sys_read(pkg, enc_offset + item_offset, item_header, sizeof(item_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset) / 16, item_header, sizeof(item_header));
+    uint8_t key_header_offset = item_header[0xC];
+
+    uint8_t key_header[0xa0];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong EDAT header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EDAT file, key/drm type is wrong!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    aes128_key psp_key;
+    uint8_t psp_iv[16];
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x10);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x30, 0x30);
+
+    uint32_t data_size = get32le(key_header + 0x44);
+    uint32_t data_offset = get32le(key_header + 0x4c);
+
+    if (data_offset != 0x90)
+    {
+        sys_error("ERROR: unsupported EDAT file, data offset is wrong!\n");
+    }
+
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);	
+
+    uint32_t block_size = 0x10;
+    uint32_t block_count = ((data_size + (block_size - 1)) / block_size );
+
+    out_begin_file(path, 0);
+    for (uint32_t i = 0; i < block_count; i++)
+    {
+        uint8_t block[0x10];
+        uint32_t block_offset = (data_offset + (i * block_size)); 
+
+        sys_read(pkg, enc_offset + item_offset + key_header_offset + block_offset, block, block_size);
+        aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset + block_offset)  / 16, block, block_size);
+        aes128_psp_decrypt(&psp_key, psp_iv, i * block_size / 16, block, block_size);
+
+        uint32_t out_size = 0x10;
+        if ( ((i + 1) * block_size) > data_size )
+        {
+            out_size = data_size - (i * block_size);
+        }
+        out_write(block, out_size);
+    }
+    out_end_file();
+}
