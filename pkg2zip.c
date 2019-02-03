@@ -272,6 +272,7 @@ typedef enum {
     PKG_TYPE_VITA_PATCH,
     PKG_TYPE_VITA_PSM,
     PKG_TYPE_PSP,
+	PKG_TYPE_PSP_THEME,
     PKG_TYPE_PSX,
 } pkg_type;
 
@@ -406,8 +407,12 @@ int main(int argc, char* argv[])
     }
     else if (content_type == 7 || content_type == 0xe || content_type == 0xf || content_type == 0x10)
     {
-        // PSP & PSP-PCEngine / PSP-Go / PSP-Mini / PSP-NeoGeo
+        // PSP & PSP-PCEngine / PSP-Go / PSP-Mini / PSP-NeoGeo / PSP DLC 
         type = PKG_TYPE_PSP;
+    }
+    else if (content_type == 0x9)
+    {
+        type = PKG_TYPE_PSP_THEME;
     }
     else if (content_type == 0x15)
     {
@@ -473,6 +478,13 @@ int main(int argc, char* argv[])
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
     }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+        //The title of the theme is in the decrypted theme header, not avilable in time to name the zip file.
+        //find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
+        id = (char*)pkg_header + 0x37;
+        memcpy(title, pkg_header + 0x44, 0x10);
+    }
     else // Vita
     {
         if (type == PKG_TYPE_VITA_PSM)
@@ -520,6 +532,14 @@ int main(int argc, char* argv[])
         if (listing == 0)
         {
             sys_output("[*] unpacking %s\n", type_str);
+        }
+    }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [PSP-Theme]%s", title, id, ext);
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking PSP Theme\n");
         }
     }
     else if (type == PKG_TYPE_PSX)
@@ -605,6 +625,11 @@ int main(int argc, char* argv[])
             sys_vstrncat(root, sizeof(root), "/%.9s", id);
             out_add_folder(root);
         }
+    }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+        snprintf(root, sizeof(root), "pspemu/PSP/THEME");
+        out_add_folder(root);
     }
     else if (type == PKG_TYPE_PSX)
     {
@@ -696,7 +721,7 @@ int main(int argc, char* argv[])
         }
 
         const aes128_key* item_key;
-        if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
+        if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX || type == PKG_TYPE_PSP_THEME)
         {
             item_key = psp_type == 0x90 ? &key : &ps3_key;
         }
@@ -815,9 +840,8 @@ int main(int argc, char* argv[])
                         {
                             if (strcmp(edat, ".edat") == 0 || strcmp(edat, ".EDAT") == 0)
                             {
-                                // TODO: decrypt something
-								unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
-								continue;
+                                unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                                continue;
                             }
                         }
                     }
@@ -826,6 +850,12 @@ int main(int argc, char* argv[])
                         continue;
                     }
                 }
+            }
+            else if (type == PKG_TYPE_PSP_THEME)
+            {
+                snprintf(path, sizeof(path), "pspemu/PSP/THEME/%s", name);
+                unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                continue;
             }
             else if (type == PKG_TYPE_VITA_PSM)
             {
@@ -911,6 +941,7 @@ int main(int argc, char* argv[])
         out_write(stat, sizeof(stat));
         out_end_file();
     }
+
 
     if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM) && zrif_arg != NULL)
     {
