@@ -22,7 +22,7 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **Vita DLC**, **Vita PATCH** and **PSM** pkg unpacking.
-* **PSX**, **PSP**, **PSP Updates**, **PSP DLC**, and **PSP THEME pkg unpacking.
+* **PSX**, **PSP**, **PSP Updates**, **PSP DLC**, and **PSP THEME** pkg unpacking.
 
 Limitations:
 
