@@ -2,13 +2,16 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch, theme and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
 
 Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string. You must provide license key.
+
+Optionally creates bgdl files for Vita Theme pkg files.
 
 # Requirements
 
 * [Henkaku][] / [Enso][]
+* [Enso][] for Vita Theme installation via bgdl.
 * [NoNpDrm][]
 * [NoPsmDrm][] for PSM titles
 * [VitaShell][] **v1.76** or newer required for DLC installation
@@ -50,6 +53,10 @@ To get output file name of the zip, use `-l` (must come before pkg file and cann
 To avoid zipping process and create individual files, use `-x` argument (must come before pkg file):
 
     pkg2zip -x package.pkg [zRIF_STRING]
+
+To generate bgdl files for Vita Theme installation, use the -b argument in conjuction with the corresponding zRIF_STRING.
+
+    pkg2zip -b -x package.pkg zRIF_STRING
 
 PSX or PSP pkg files do not require zRIF argument. It will be ignored.
 

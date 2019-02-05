@@ -271,8 +271,9 @@ typedef enum {
     PKG_TYPE_VITA_DLC,
     PKG_TYPE_VITA_PATCH,
     PKG_TYPE_VITA_PSM,
+    PKG_TYPE_VITA_THEME,
     PKG_TYPE_PSP,
-	PKG_TYPE_PSP_THEME,
+    PKG_TYPE_PSP_THEME,
     PKG_TYPE_PSX,
 } pkg_type;
 
@@ -284,6 +285,7 @@ int main(int argc, char* argv[])
     int listing = 0;
     int cso = 0;
     int pbp = 0;
+    int bgdl = 0;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
@@ -308,6 +310,10 @@ int main(int argc, char* argv[])
         {
             pbp = 1;
         }
+        else if (strcmp(argv[i], "-b") == 0)
+        {
+            bgdl = 1;
+        }        
         else
         {
             if (pkg_arg != NULL)
@@ -328,7 +334,7 @@ int main(int argc, char* argv[])
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        sys_error("Usage: %s [-x] [-l] [-c[N]] file.pkg [zRIF]\n", argv[0]);
+        sys_error("Usage: %s [-x] [-l] [-c[N]] [-b] [-p] file.pkg [zRIF]\n", argv[0]);
     }
 
     if (listing == 0)
@@ -365,7 +371,7 @@ int main(int argc, char* argv[])
     {
         sys_error("ERROR: pkg file is too small\n");
     }
-
+    
     uint32_t content_type = 0;
     uint32_t sfo_offset = 0;
     uint32_t sfo_size = 0;
@@ -425,6 +431,10 @@ int main(int argc, char* argv[])
     else if (content_type == 0x18 || content_type == 0x1d)
     {
         type = PKG_TYPE_VITA_PSM;
+    }
+    else if (content_type ==  0x1f)
+    {
+        type = PKG_TYPE_VITA_THEME;
     }
     else
     {
@@ -491,6 +501,11 @@ int main(int argc, char* argv[])
         {
             memcpy(content, pkg_header + 0x30, 0x30);
             rif_size = 1024;
+        }
+        else if (type == PKG_TYPE_VITA_THEME)
+        {
+            parse_sfo(pkg, sfo_offset, sfo_size, category, title, content, min_version, pkg_version);
+            rif_size = 512;
         }
         else // Vita APP, DLC or PATCH
         {
@@ -575,6 +590,14 @@ int main(int argc, char* argv[])
         }
     }
     else if (type == PKG_TYPE_VITA_APP)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
+        if (listing == 0)
+        {
+            sys_output("[*] unpacking Vita APP\n");
+        }
+    }
+    else if (type == PKG_TYPE_VITA_THEME)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
         if (listing == 0)
@@ -680,6 +703,42 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
     }
+    else if (type == PKG_TYPE_VITA_THEME)
+    {
+
+        if (bgdl == 1)
+        {
+            sys_vstrncat(root, sizeof(root), "bgdl/t");
+            out_add_folder(root);
+
+            uint32_t bgdl_task = 0;
+            char dir[255] = {0};
+            if(zipped == 0)
+            {
+                do 
+                {
+                    bgdl_task++;
+                    snprintf(dir, sizeof(dir), "%s/%08x",root, bgdl_task);
+                } 
+                while (sys_test_dir(dir));
+            }
+            else
+            {
+                bgdl_task = 1;
+            }
+
+            sys_vstrncat(root,sizeof(root), "/%08x", bgdl_task);
+            out_add_folder(root);
+        }
+        else 
+        {
+            sys_vstrncat(root, sizeof(root), "app");
+            out_add_folder(root);
+        }
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+    }
     else
     {
         assert(0);
@@ -749,7 +808,7 @@ int main(int argc, char* argv[])
                     out_add_folder(path);
                 }
             }
-            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
             {
                 snprintf(path, sizeof(path), "%s/%s", root, name);
                 out_add_folder(path);
@@ -763,7 +822,7 @@ int main(int argc, char* argv[])
         else
         {
             int decrypt = 1;
-            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH) && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME) && strcmp("sce_sys/package/digs.bin", name) == 0)
             {
                 // TODO: is this really needed?
                 if (!sce_sys_package_created)
@@ -892,7 +951,7 @@ int main(int argc, char* argv[])
 
     sys_output("[*] unpacking completed\n");
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || PKG_TYPE_VITA_THEME)
     {
         if (!sce_sys_package_created)
         {
@@ -942,8 +1001,7 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-
-    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM) && zrif_arg != NULL)
+    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM || type == PKG_TYPE_VITA_THEME) && zrif_arg != NULL)
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
@@ -964,6 +1022,59 @@ int main(int argc, char* argv[])
         out_write(rif, rif_size);
         out_end_file();
     }
+
+    if (type == PKG_TYPE_VITA_THEME && bgdl == 1)
+    {
+        //get the parent directory
+        char* lastslash = strrchr(root, '/');
+        if (lastslash != NULL)
+        {
+            snprintf(root, strlen(root)-strlen(lastslash)+1, "%s", root);
+        }
+        uint8_t pdb[0x200] = { 0 };
+        //PDB entries :: https://www.psdevwiki.com/ps3/Project_Database_(PDB)
+        memcpy(pdb+0x04,"\x64\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10);
+        memcpy(pdb+0x14,"\x65\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // 02 in d0.pdb, 00 in d1.pdb 
+        memcpy(pdb+0x24,"\x66\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);             // "Task unregister auto"
+        memcpy(pdb+0x31,"\x68\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // unknown but required
+        memcpy(pdb+0x41,"\x6B\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x0C\x00\x00\x00",0x10); // "Task Subtype"
+        memcpy(pdb+0x51,"\x6C\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x01\x00\x00\x00",0x10); // unknown but required 
+        memcpy(pdb+0x61,"\x6D\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00",0x10); // unknown but required 
+        memcpy(pdb+0x71,"\x6E\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0x7E,"\x6F\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // unknown but required
+        memcpy(pdb+0x8E,"\x70\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);
+        memcpy(pdb+0x9B,"\x71\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);
+        memcpy(pdb+0xA8,"\x72\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10);
+        memcpy(pdb+0xB8,"\x73\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0xC5,"\x74\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0xD2,"\x69\x00\x00\x00\x0F\x00\x00\x00\x0F\x00\x00\x00",0x0C);                 //pkg title
+        memcpy(pdb+0xDE,title,0x0D);
+        memcpy(pdb+0xED,"\xD9\x00\x00\x00\x25\x00\x00\x00\x25\x00\x00\x00",0x0C);                 //ContentID
+        memcpy(pdb+0xF9,id,0x25);
+        memcpy(pdb+0x11E,"\xDA\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);            // Download Complete Flag
+        memcpy(pdb+0x12B,"\xDC\x00\x00\x00\x0A\x00\x00\x00\x0A\x00\x00\x00",0x0C);                //Content ID 
+        memcpy(pdb+0x137,id,0x09);
+ 
+        pdb[0x20] = 0x02;
+        sys_output("[*] creating d0.pdb\n");
+        snprintf(path, sizeof(path), "%s/d0.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,sizeof(pdb));
+        out_end_file();
+
+        pdb[0x20] = 0x00;
+        sys_output("[*] creating d1.pdb\n");
+        snprintf(path, sizeof(path), "%s/d1.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,sizeof(pdb));
+        out_end_file();
+
+        sys_output("[*] creating f0.pdb\n");
+        snprintf(path, sizeof(path), "%s/f0.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,0);
+        out_end_file();
+        }
 
     if (type == PKG_TYPE_VITA_PSM)
     {

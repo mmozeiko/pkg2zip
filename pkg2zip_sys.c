@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 
 #if defined(_WIN32)
 
@@ -121,7 +122,7 @@ sys_file sys_create(const char* fname)
     HANDLE handle = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        sys_error("ERROR: cannot create '%s' file\n", fname);
+        sys_error("ERROR:1: cannot create '%s' file\n", fname);
     }
 
     return handle;
@@ -233,7 +234,7 @@ sys_file sys_create(const char* fname)
     int fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd < 0)
     {
-        sys_error("ERROR: cannot create '%s' file\n", fname);
+        sys_error("ERROR:2: cannot create '%s' file\n", fname);
     }
 
     return (void*)(intptr_t)fd;
@@ -342,4 +343,19 @@ void sys_output_progress(uint64_t progress)
         sys_output("[*] unpacking... %u%%\r", now);
         out_next = now + 1;
     }
+}
+
+int sys_test_dir(const char* const path)
+{
+    struct stat info;
+
+    int statRC = stat( path, &info );
+    if( statRC != 0 )
+    {
+        if (errno == ENOENT)  { return 0; } 
+        if (errno == ENOTDIR) { return 0; } 
+        return -1;
+    }
+
+    return ( info.st_mode & S_IFDIR ) ? 1 : 0;
 }
