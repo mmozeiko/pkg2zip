@@ -794,7 +794,7 @@ int main(int argc, char* argv[])
         aes128_ctr_xor(item_key, iv, name_offset / 16, (uint8_t*)name, name_size);
         name[name_size] = 0;
 
-        // sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
+        //  sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
 
         if (flags == 4 || flags == 18)
         {
@@ -822,7 +822,7 @@ int main(int argc, char* argv[])
         else
         {
             int decrypt = 1;
-            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME) && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME) && (strcmp("sce_sys/package/digs.bin", name) == 0 || strcmp("sce_sys/package/cert.bin", name) == 0 ))
             {
                 // TODO: is this really needed?
                 if (!sce_sys_package_created)
@@ -845,6 +845,10 @@ int main(int argc, char* argv[])
                 else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
                     snprintf(path, sizeof(path), "%s/EBOOT.PBP", root);
+                }
+                else if (strcmp("USRDIR/CONTENT/texture.enc", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "%s/texture.enc", root);
                 }
                 else
                 {
@@ -951,7 +955,7 @@ int main(int argc, char* argv[])
 
     sys_output("[*] unpacking completed\n");
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || PKG_TYPE_VITA_THEME)
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
     {
         if (!sce_sys_package_created)
         {
