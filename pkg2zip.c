@@ -487,6 +487,17 @@ int main(int argc, char* argv[])
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
+
+        if (type == PKG_TYPE_PSX && zrif_arg != NULL)  //pocketstation pkg type is PSX
+        {
+			rif_size = 512;
+            zrif_decode(zrif_arg, rif, rif_size);
+            //const char* rif_contentid = (char*)rif +  0x10;
+            //if (strncmp(rif_contentid, content, 0x30) != 0)
+            //{
+            //    sys_error("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
+            //}
+        }
     }
     else if (type == PKG_TYPE_PSP_THEME)
     {
@@ -848,7 +859,10 @@ int main(int argc, char* argv[])
                 }
                 else if (strcmp("USRDIR/CONTENT/texture.enc", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/texture.enc", root);
+                    // Pocketstation
+                    snprintf(path, sizeof(path), "ps1emu/%.9s", id);
+                    out_add_folder(path);
+                    snprintf(path, sizeof(path), "ps1emu/%.9s/texture.enc", id);
                 }
                 else
                 {
@@ -1005,7 +1019,7 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM || type == PKG_TYPE_VITA_THEME) && zrif_arg != NULL)
+    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM || type == PKG_TYPE_VITA_THEME || type == PKG_TYPE_PSX) && zrif_arg != NULL)
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
@@ -1015,6 +1029,15 @@ int main(int argc, char* argv[])
 
             sys_output("[*] creating RO/License/FAKE.rif\n");
             snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
+        }
+        else if (type == PKG_TYPE_PSX)
+        {
+            //For Pocketstation
+            sys_output("[*] creating rif");
+            const char* rif_contentid = (char*)rif + 0x10;
+            snprintf(path, sizeof(path), "pspemu/PSP/LICENSE");
+            out_add_folder(path);
+            snprintf(path, sizeof(path), "pspemu/PSP/LICENSE/%s.rif", rif_contentid);
         }
         else
         {
