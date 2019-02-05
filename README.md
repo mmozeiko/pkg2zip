@@ -54,7 +54,7 @@ To avoid zipping process and create individual files, use `-x` argument (must co
 
     pkg2zip -x package.pkg [zRIF_STRING]
 
-To generate bgdl files for Vita Theme installation, use the -b argument in conjuction with the corresponding zRIF_STRING.
+To generate bgdl files for Vita Theme installation, use the '-b' argument in conjuction with the corresponding zRIF_STRING.
 
     pkg2zip -b -x package.pkg zRIF_STRING
 
@@ -72,7 +72,7 @@ You can combine -cN argument together with -x:
 
     pkg2zip -x -c9 package.pkg
 
-To keep PSP files in their original EBOOT.PBP format: 
+To keep PSP files in their original EBOOT.PBP format use the '-p' argument: 
 
     pkg2zip -p package.pkg
 
