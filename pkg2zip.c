@@ -316,9 +316,13 @@ int main(int argc, char* argv[])
         }        
         else
         {
-            if (pkg_arg != NULL)
+            if (pkg_arg != NULL )
             {
-                zrif_arg = argv[i];
+                if(strlen(argv[i]) != 0)
+                {
+                    zrif_arg = argv[i];
+                }
+
                 break;
             }
             else
@@ -490,13 +494,8 @@ int main(int argc, char* argv[])
 
         if (type == PKG_TYPE_PSX && zrif_arg != NULL)  //pocketstation pkg type is PSX
         {
-			rif_size = 512;
+            rif_size = 512;
             zrif_decode(zrif_arg, rif, rif_size);
-            //const char* rif_contentid = (char*)rif +  0x10;
-            //if (strncmp(rif_contentid, content, 0x30) != 0)
-            //{
-            //    sys_error("ERROR: zRIF content id '%s' doesn't match pkg '%s'\n", rif_contentid, content);
-            //}
         }
     }
     else if (type == PKG_TYPE_PSP_THEME)
