@@ -814,7 +814,14 @@ int main(int argc, char* argv[])
                 char* slash = strchr(name, '/');
                 if (slash != NULL)
                 {
-                    snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                    if (strstr(name, "runtime"))
+                    {
+                        snprintf(path, sizeof(path), "%s/%s", root, name + 8);
+                    }
+                    else
+                    {
+                        snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                    }
                     out_add_folder(path);
                 }
             }
@@ -936,7 +943,14 @@ int main(int argc, char* argv[])
             else if (type == PKG_TYPE_VITA_PSM)
             {
                 // skip "content/" prefix
-                snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                if (strstr(name, "runtime"))
+                {
+                   snprintf(path, sizeof(path), "%s/%s", root, name + 8);
+                }
+                else
+                {
+                   snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                }
             }
             else
             {
