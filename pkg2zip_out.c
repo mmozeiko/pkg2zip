@@ -1,6 +1,7 @@
 #include "pkg2zip_out.h"
 #include "pkg2zip_sys.h"
 #include "pkg2zip_zip.h"
+#include <stdio.h>
 
 static zip out_zip;
 static int out_zipped;
@@ -33,6 +34,24 @@ void out_add_folder(const char* path)
     else
     {
         sys_mkdir(path);
+    }
+}
+
+void out_add_parent(const char* path)
+{
+    char parent[1024];
+    char* lastslash = strrchr(path, '/');
+    if (lastslash != NULL)
+    {
+        snprintf(parent, strlen(path)-strlen(lastslash)+1, "%s", path);
+        if (out_zipped)
+        {
+            zip_add_folder(&out_zip, parent);
+        }
+        else
+        {
+            sys_mkdir(parent);
+        }
     }
 }
 
