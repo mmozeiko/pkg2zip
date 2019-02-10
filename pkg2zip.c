@@ -380,6 +380,7 @@ int main(int argc, char* argv[])
     uint32_t sfo_size = 0;
     uint32_t items_offset = 0;
     uint32_t items_size = 0;
+    char install_directory[0x28] = {0};
 
     for (uint32_t i = 0; i < meta_count; i++)
     {
@@ -403,6 +404,10 @@ int main(int argc, char* argv[])
             sfo_offset = get32be(block + 8);
             sfo_size = get32be(block + 12);
         }
+        else if (type == 10)
+        {
+            sys_read(pkg, meta_offset + 8 + 8, install_directory,sizeof(install_directory));
+        }
 
         meta_offset += 2 * sizeof(uint32_t) + size;
     }
@@ -416,7 +421,7 @@ int main(int argc, char* argv[])
     }
     else if (content_type == 7 || content_type == 0xe || content_type == 0xf || content_type == 0x10)
     {
-        // PSP & PSP-PCEngine / PSP-Go / PSP-Mini / PSP-NeoGeo / PSP DLC 
+        // PSP & PSP-PCEngine & DLC / PSP-Go / PSP-Mini / PSP-NeoGeo 
         type = PKG_TYPE_PSP;
     }
     else if (content_type == 0x9)
@@ -546,7 +551,7 @@ int main(int argc, char* argv[])
         const char* type_str;
         if (content_type == 7)
         {
-            type_str = (strcmp(category, "HG") == 0) ? "PSP-PCEngine" : "PSP";
+            type_str = (strcmp(category, "HG") == 0) ? "PSP-PCEngine" : install_directory[0] != 0 ? "PSP-DLC" :"PSP";
         }
         else
         {
@@ -629,6 +634,7 @@ int main(int argc, char* argv[])
     {
         sys_error("ERROR: Listing option without creating zip is useless\n");
     }
+
 
     if (zipped)
     {
@@ -835,24 +841,32 @@ int main(int argc, char* argv[])
             }
             else if (type == PKG_TYPE_PSP)
             {
-                if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0 && pbp == 0)
+                if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
-                    out_add_parent(path);
-                    unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);
-                    continue;
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/EBOOT.PBP", id);
+                    if (!pbp)
+                    {
+                        snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
+                        out_add_parent(path);
+                        unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);
+                        continue;
+                    }
                 }
-                else if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0 && pbp == 0)
+                else if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
-                    continue;
-                }
-                else if (strcmp("USRDIR/CONTENT/DOCINFO.EDAT", name) == 0 && pbp == 0)
-                {
-                    continue;
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCUMENT.DAT", id);
+                    if (!pbp)
+                    {
+                        continue;
+                    }
                 }
                 else if (strcmp("USRDIR/CONTENT/DOCINFO.EDAT", name) == 0)
                 {
                     snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCINFO.EDAT", id);
+                    if (!pbp)
+                    {
+                        continue;
+                    }
                 }
                 else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)
                 {
@@ -1038,14 +1052,14 @@ int main(int argc, char* argv[])
         memcpy(pdb+0xA8,"\x72\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10);
         memcpy(pdb+0xB8,"\x73\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
         memcpy(pdb+0xC5,"\x74\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
-        memcpy(pdb+0xD2,"\x69\x00\x00\x00\x0F\x00\x00\x00\x0F\x00\x00\x00",0x0C);                 //pkg title
-        memcpy(pdb+0xDE,title,0x0D);
-        memcpy(pdb+0xED,"\xD9\x00\x00\x00\x25\x00\x00\x00\x25\x00\x00\x00",0x0C);                 //ContentID
-        memcpy(pdb+0xF9,id,0x25);
-        memcpy(pdb+0x11E,"\xDA\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);            // Download Complete Flag
-        memcpy(pdb+0x12B,"\xDC\x00\x00\x00\x0A\x00\x00\x00\x0A\x00\x00\x00",0x0C);                //Content ID 
-        memcpy(pdb+0x137,id,0x09);
- 
+        memcpy(pdb+0xD2,"\x69\x00\x00\x00\x44\x00\x00\x00\x44\x00\x00\x00",0x0C);                 //pkg title
+        memcpy(pdb+0xDE,title,0x40);
+        memcpy(pdb+0x122,"\xD9\x00\x00\x00\x25\x00\x00\x00\x25\x00\x00\x00",0x0C);                 //ContentID
+        memcpy(pdb+0x12E,id,0x25);
+        memcpy(pdb+0x153,"\xDA\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);            // Download Complete Flag
+        memcpy(pdb+0x160,"\xDC\x00\x00\x00\x0A\x00\x00\x00\x0A\x00\x00\x00",0x0C);                //Content ID 
+        memcpy(pdb+0x16C,id,0x09);
+
         pdb[0x20] = 0x02;
         sys_output("[*] creating d0.pdb\n");
         snprintf(path, sizeof(path), "%s/d0.pdb", root);
@@ -1065,7 +1079,7 @@ int main(int argc, char* argv[])
         out_begin_file(path,0);
         out_write(pdb,0);
         out_end_file();
-        }
+    }
 
     if (type == PKG_TYPE_VITA_PSM)
     {
