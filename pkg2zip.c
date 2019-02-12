@@ -832,7 +832,7 @@ int main(int argc, char* argv[])
                 }
                 else if (strcmp("USRDIR/CONTENT/texture.enc", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/%.9s/texture.enc", id);
+                    snprintf(path, sizeof(path), "ps1emu/%.9s/texture.enc", id);
                 }
                 else
                 {
