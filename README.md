@@ -60,7 +60,7 @@ To generate bgdl files for Vita Theme installation, use the '-b' argument in con
 
 PSX or PSP pkg files do not require zRIF argument. It will be ignored.
 
-For PSP files pkg2zip by default will create .ISO file. To create compressed .CSO file pass -cN argument where N is compression factor. For example, for fastest compression use:
+For PSP files pkg2zip by default will create a .ISO file. To create a compressed .CSO file pass -cN argument where N is compression factor. For example, for fastest compression use:
 
     pkg2zip -c1 package.pkg
 
@@ -72,7 +72,7 @@ You can combine -cN argument together with -x:
 
     pkg2zip -x -c9 package.pkg
 
-To keep PSP files in their original EBOOT.PBP format use the '-p' argument: 
+To extract PSP files in their original EBOOT.PBP format use the '-p' argument: 
 
     pkg2zip -p package.pkg
 
@@ -125,9 +125,9 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
 
 [travis]: https://travis-ci.org/mmozeiko/pkg2zip/
 [appveyor]: https://ci.appveyor.com/project/mmozeiko/pkg2zip/
-[downloads]: https://github.com/mmozeiko/pkg2zip/releases
-[latest]: https://github.com/mmozeiko/pkg2zip/releases/latest
-[license]: https://github.com/mmozeiko/pkg2zip/blob/master/LICENSE
+[downloads]: https://github.com/lusid1/pkg2zip/releases
+[latest]: https://github.com/lusid1/pkg2zip/releases/latest
+[license]: https://github.com/lusid1/pkg2zip/blob/master/LICENSE
 [img_travis]: https://api.travis-ci.org/mmozeiko/pkg2zip.svg?branch=master
 [img_appveyor]: https://ci.appveyor.com/api/projects/status/xmkl6509ahlp9b7k/branch/master?svg=true
 [img_downloads]: https://img.shields.io/github/downloads/mmozeiko/pkg2zip/total.svg?maxAge=3600
