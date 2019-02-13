@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
     int listing = 0;
     int cso = 0;
     int pbp = 0;
-    int bgdl = 0;
+    int bgdl = 1;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
@@ -312,8 +312,8 @@ int main(int argc, char* argv[])
         }
         else if (strcmp(argv[i], "-b") == 0)
         {
-            bgdl = 1;
-        }        
+            bgdl = 0;
+        }
         else
         {
             if (pkg_arg != NULL )
@@ -407,6 +407,7 @@ int main(int argc, char* argv[])
         else if (type == 10)
         {
             sys_read(pkg, meta_offset + 8 + 8, install_directory,sizeof(install_directory));
+            //sys_output("[*] DLC Install Directory: %s\n", install_directory);
         }
 
         meta_offset += 2 * sizeof(uint32_t) + size;
