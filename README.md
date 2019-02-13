@@ -6,8 +6,6 @@ Utility that decrypts PlayStation Vita pkg file and creates zip package. Support
 
 Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string. You must provide license key.
 
-Optionally creates bgdl files for Vita Theme pkg files.
-
 # Requirements
 
 * [Henkaku][] / [Enso][]
@@ -54,7 +52,7 @@ To avoid zipping process and create individual files, use `-x` argument (must co
 
     pkg2zip -x package.pkg [zRIF_STRING]
 
-To generate bgdl files for Vita Theme installation, use the '-b' argument in conjuction with the corresponding zRIF_STRING.
+To disable bgdl output for VITA Theme extraction, use the '-b' argument.
 
     pkg2zip -b -x package.pkg zRIF_STRING
 
