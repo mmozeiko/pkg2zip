@@ -829,6 +829,8 @@ int main(int argc, char* argv[])
                 }
                 else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/KEYS.BIN", id);
+                    unpack_keys_bin(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
                     snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/EBOOT.PBP", id);
                 }
                 else if (strcmp("USRDIR/CONTENT/texture.enc", name) == 0)

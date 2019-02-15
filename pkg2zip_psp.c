@@ -311,6 +311,21 @@ static void init_psp_decrypt(aes128_key* key, uint8_t* iv, int eboot, const uint
     }
 }
 
+static void init_psx_keys(uint8_t* iv, const uint8_t* mac, const uint8_t* header, uint32_t offset1)
+{
+    uint8_t tmp[16];
+    memcpy(tmp, header + offset1, 16);
+
+    aes128_key aes;
+    aes128_init_dec(&aes, kirk7_key38);
+    aes128_ecb_decrypt(&aes, tmp, tmp);
+
+    for (size_t i = 0; i < 16; i++)
+    {
+        iv[i] = mac[i] ^ tmp[i] ^ amctl_hashkey_3[i];
+    }
+
+}
 void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size, int cso)
 {
     if (item_size < 0x28)
@@ -630,7 +645,7 @@ void unpack_psp_edat(const char* path, const aes128_key* pkg_key, const uint8_t*
         sys_error("ERROR: unsupported EDAT file, data offset is wrong!\n");
     }
 
-    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);	
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
 
     uint32_t block_size = 0x10;
     uint32_t block_count = ((data_size + (block_size - 1)) / block_size );
@@ -654,3 +669,75 @@ void unpack_psp_edat(const char* path, const aes128_key* pkg_key, const uint8_t*
     }
     out_end_file();
 }
+
+void unpack_keys_bin(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+{
+
+    if (item_size < 0x28 + 0x10 + 0x1f0)
+    {
+        sys_error("ERROR: EBOOT file is to short!\n");
+    }
+
+    uint8_t eboot_header[0x28];
+    sys_read(pkg, enc_offset + item_offset, eboot_header, sizeof(eboot_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, item_offset / 16, eboot_header, sizeof(eboot_header));
+
+    if (memcmp(eboot_header, "\x00PBP", 4) != 0)
+    {
+        sys_error("ERROR: wrong eboot header signature!\n");
+    }
+
+    uint32_t psar_offset = get32le(eboot_header + 0x24);
+
+    if (psar_offset + 16 > item_size)
+    {
+        sys_error("ERROR: eboot file is to short!\n");
+    }
+    assert(psar_offset % 16 == 0);
+
+    uint8_t psar_header[16];
+    sys_read(pkg, enc_offset + item_offset + psar_offset, psar_header, sizeof(psar_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + psar_offset) / 16, psar_header, sizeof(psar_header));
+
+    uint32_t key_header_offset = 0;
+    if (memcmp(psar_header, "PSTITLE", 7) == 0)
+    {
+        key_header_offset = 0x1f0;
+    }
+    else if (memcmp(psar_header, "PSISO", 5) == 0)
+    {
+        key_header_offset = 0x3f0;
+    }
+    else 
+    {
+        sys_error("ERROR: wrong psar header signature!\n");
+    }
+
+    uint8_t key_header[0x90];
+    sys_read(pkg, enc_offset + item_offset + psar_offset+ 16 + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + psar_offset + 16 + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong key header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EBOOT file, key/drm type is unsupported!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    uint8_t keys_bin[16];
+    init_psx_keys(keys_bin, mac, key_header, 0x70);
+
+    out_begin_file(path, 0);
+    out_write(keys_bin, sizeof(keys_bin));
+    out_end_file();
+}
+
