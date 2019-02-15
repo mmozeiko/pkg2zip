@@ -332,7 +332,7 @@ int main(int argc, char* argv[])
     }
     if (listing == 0)
     {
-        sys_output("pkg2zip v2.0\n");
+        sys_output("pkg2zip v2.1\n");
     }
     if (pkg_arg == NULL)
     {
