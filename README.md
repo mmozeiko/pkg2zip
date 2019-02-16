@@ -129,7 +129,7 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
 [img_travis]: https://api.travis-ci.org/mmozeiko/pkg2zip.svg?branch=master
 [img_appveyor]: https://ci.appveyor.com/api/projects/status/xmkl6509ahlp9b7k/branch/master?svg=true
 [img_downloads]: https://img.shields.io/github/downloads/mmozeiko/pkg2zip/total.svg?maxAge=3600
-[img_latest]: https://img.shields.io/github/release/mmozeiko/pkg2zip.svg?maxAge=3600
+[img_latest]: https://img.shields.io/github/release/lusid1/pkg2zip.svg?maxAge=3600
 [img_license]: https://img.shields.io/github/license/mmozeiko/pkg2zip.svg?maxAge=2592000
 [Adrenaline]: https://github.com/TheOfficialFloW/Adrenaline
 [NoNpDrm]: https://github.com/TheOfficialFloW/NoNpDrm
