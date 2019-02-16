@@ -505,10 +505,37 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_PSP_THEME)
     {
-        //The title of the theme is in the decrypted theme header, not avilable in time to name the zip file.
-        //find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
+
         id = (char*)pkg_header + 0x37;
         memcpy(title, pkg_header + 0x44, 0x10);
+
+        uint8_t item[32];
+        sys_read(pkg, enc_offset + items_offset, item, sizeof(item));
+        aes128_ctr_xor(&key, iv, items_offset / 16, item, sizeof(item));
+
+        uint64_t data_offset = get64be(item + 8);
+        uint64_t data_size = get64be(item + 16);
+        uint8_t psp_type = item[24];
+
+        assert(data_offset % 16 == 0);
+
+        if (pkg_size < enc_offset + data_offset + data_size)
+        {
+            sys_error("ERROR: pkg file is too short, possibly corrupted\n");
+        }
+
+        const aes128_key* item_key;
+        item_key = psp_type == 0x90 ? &key : &ps3_key;
+        get_psp_theme_title(title,item_key, iv, pkg, enc_offset, data_offset);
+
+        //Theme names are prone to having colons
+        for (uint32_t i = 0; i < sizeof(title); i++)
+        {
+            if (title[i] == 58)
+            {
+                title[i] = 32;
+            }
+        }
     }
     else // Vita
     {

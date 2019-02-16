@@ -741,3 +741,52 @@ void unpack_keys_bin(const char* path, const aes128_key* pkg_key, const uint8_t*
     out_end_file();
 }
 
+void get_psp_theme_title(char* title, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset)
+{
+    uint8_t item_header[90];
+    sys_read(pkg, enc_offset + item_offset, item_header, sizeof(item_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset) / 16, item_header, sizeof(item_header));
+    uint8_t key_header_offset = item_header[0xC];
+
+    uint8_t key_header[0xa0];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong EDAT header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EDAT file, key/drm type is wrong!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    aes128_key psp_key;
+    uint8_t psp_iv[16];
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x10);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x30, 0x30);
+
+    uint32_t data_offset = get32le(key_header + 0x4c);
+
+    uint8_t theme_header[256];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset + data_offset, theme_header, sizeof(theme_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset + data_offset)/ 16, theme_header, sizeof(theme_header));
+
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, theme_header, sizeof(theme_header));
+
+    if (memcmp(theme_header, "\x00PTF", 4) != 0)
+    {
+        sys_error("ERROR: wrong PTF header signature!\n");
+    }
+
+    memcpy(title,theme_header+8, 128);
+    title[128]=0;
+}
