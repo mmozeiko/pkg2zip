@@ -73,6 +73,7 @@ You can combine -cN argument together with -x:
 To extract PSP files in their original EBOOT.PBP format use the '-p' argument: 
 
     pkg2zip -p package.pkg
+Note: On PSP hardware titles with DLC should be kept in ISO/CSO format due to limitations on the CFW NoDRM Engine.
 
 # Generating zRIF string
 
