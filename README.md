@@ -28,7 +28,6 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 Limitations:
 
 * no actual title name is extracted for PSM pkg files.
-* no actual title name is extracted for PSP Theme files.
 
 # Usage
 
