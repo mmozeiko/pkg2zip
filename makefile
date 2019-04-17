@@ -5,6 +5,10 @@ else
   EXE :=
 endif
 
+DESTDIR=
+PREFIX=/usr/local
+BINDIR=$(PREFIX)/bin
+
 BIN=pkg2zip${EXE}
 SRC=${wildcard pkg2zip*.c} miniz_tdef.c puff.c
 OBJ=${SRC:.c=.o}
@@ -16,6 +20,16 @@ LDFLAGS=-s
 .PHONY: all clean
 
 all: ${BIN}
+
+install:
+	install -o root -g root -m 0755 ${BIN} $(DESTDIR)$(BINDIR)/${BIN}
+	install -o root -g root -m 0755 rif2zrif.py $(DESTDIR)$(BINDIR)/rif2zrif
+	install -o root -g root -m 0755 zrif2rif.py $(DESTDIR)$(BINDIR)/zrif2rif
+
+uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/${BIN}
+	rm -f $(DESTDIR)$(BINDIR)/rif2zrif
+	rm -f $(DESTDIR)$(BINDIR)/zrif2rif
 
 clean:
 	@${RM} ${BIN} ${OBJ} ${DEP}
