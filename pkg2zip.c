@@ -1064,7 +1064,7 @@ int main(int argc, char* argv[])
         char* lastslash = strrchr(root, '/');
         if (lastslash != NULL)
         {
-            snprintf(root, strlen(root)-strlen(lastslash)+1, "%s", root);
+            root[strlen(root)-strlen(lastslash)] = 0;
         }
         uint8_t pdb[0x200] = { 0 };
         //PDB entries :: https://www.psdevwiki.com/ps3/Project_Database_(PDB)
