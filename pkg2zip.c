@@ -535,7 +535,7 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_VITA_PATCH)
     {
-        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s] [fw %s]%s", title, id, get_region(id), pkg_version, min_version, ext);
         if (listing == 0)
         {
             sys_output("[*] unpacking Vita PATCH\n");
@@ -551,7 +551,7 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_VITA_APP)
     {
-        snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [fw %s]%s", title, id, get_region(id), min_version, ext);
         if (listing == 0)
         {
             sys_output("[*] unpacking Vita APP\n");
