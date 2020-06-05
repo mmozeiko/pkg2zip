@@ -266,6 +266,23 @@ static const char* get_region(const char* id)
     }
 }
 
+void print_help(char* bin_name)
+{
+    sys_output("Parameters:\n");
+    sys_output("\n");
+    sys_output("-x|--extract       Extract only. No zip compression\n");
+    sys_output("-l|--list          Shows the package (sfo) name and exits\n");
+    sys_output("-b|--no-bgdl       Disable bgdl output for VITA Theme extraction\n");
+    sys_output("-q|--quiet         Do not output anything to stdout\n");
+    sys_output("-h|--help          Shows this help message\n");
+    sys_output("\n");
+    sys_output("PSP/PSX only options:\n");
+    sys_output("-c[NUM]            Create a *.CSO file instead of ISO. [NUM] is the compression ratio\n");
+    sys_output("-p|--psp           Extracts PSP files in their original EBOOT.PBP format\n");
+    sys_output("\n");
+    sys_output("Usage: %s [-x] [-c[N]] [-b] [-p] <file.pkg> [zRIF]\n", bin_name);
+}
+
 typedef enum {
     PKG_TYPE_VITA_APP,
     PKG_TYPE_VITA_DLC,
@@ -283,6 +300,7 @@ int main(int argc, char* argv[])
 
     int zipped = 1;
     int listing = 0;
+    int verbose = 1;
     int cso = 0;
     int pbp = 0;
     int bgdl = 1;
@@ -290,13 +308,14 @@ int main(int argc, char* argv[])
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "-x") == 0)
+        if (strcmp(argv[i], "-x") == 0 || strcmp(argv[i], "--extract") == 0)
         {
             zipped = 0;
         }
-        else if (strcmp(argv[i], "-l") == 0)
+        else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--list") == 0)
         {
             listing = 1;
+            verbose = 0;
         }
         else if (strncmp(argv[i], "-c", 2) == 0)
         {
@@ -306,13 +325,24 @@ int main(int argc, char* argv[])
                 cso = cso > 9 ? 9 : cso < 0 ? 0 : cso;
             }
         }
-        else if (strcmp(argv[i], "-p") == 0)
+        else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--psp") == 0)
         {
             pbp = 1;
         }
-        else if (strcmp(argv[i], "-b") == 0)
+        else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--no-bgdl") == 0)
         {
             bgdl = 0;
+        }
+        else if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0)
+        {
+            verbose = 0;
+        }
+        else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        {
+            sys_output("pkg2zip v2.2\n");
+            sys_output("\n");
+            print_help(argv[0]);
+            exit(0);
         }
         else
         {
@@ -330,17 +360,19 @@ int main(int argc, char* argv[])
             }
         }
     }
-    if (listing == 0)
-    {
-        sys_output("pkg2zip v2.2\n");
-    }
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        sys_error("Usage: %s [-x] [-l] [-c[N]] [-b] [-p] file.pkg [zRIF]\n", argv[0]);
+        print_help(argv[0]);
+        exit(1);
     }
 
-    if (listing == 0)
+    if (verbose)
+    {
+        sys_output("pkg2zip v2.2\n");
+    }
+
+    if (verbose)
     {
         sys_output("[*] loading...\n");
     }
@@ -586,7 +618,7 @@ int main(int argc, char* argv[])
             type_str = content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
         }
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking %s\n", type_str);
         }
@@ -594,7 +626,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_PSP_THEME)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSP-Theme]%s", title, id, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking PSP Theme\n");
         }
@@ -602,7 +634,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_PSX)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking PSX\n");
         }
@@ -610,7 +642,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita DLC\n");
         }
@@ -618,7 +650,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita PATCH\n");
         }
@@ -626,7 +658,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s] [PSM]%s", id, get_region(id), ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita PSM\n");
         }
@@ -634,7 +666,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita APP\n");
         }
@@ -642,9 +674,9 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_THEME)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        if (listing == 0)
+        if (verbose)
         {
-            sys_output("[*] unpacking Vita APP\n");
+            sys_output("[*] unpacking Vita theme\n");
         }
     }
     else
@@ -664,7 +696,7 @@ int main(int argc, char* argv[])
     }
 
 
-    if (zipped)
+    if (verbose)
     {
         sys_output("[*] creating '%s' archive\n", root);
     }
@@ -843,7 +875,10 @@ int main(int argc, char* argv[])
             {
                 snprintf(path, sizeof(path), "%s/sce_sys/package", root);
                 out_add_folder(path);
-                sys_output("[*] renaming %s to body.bin\n", name);
+                if (verbose)
+                {
+                    sys_output("[*] renaming %s to body.bin\n", name);
+                }
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
             }
@@ -981,11 +1016,17 @@ int main(int argc, char* argv[])
         }
     }
 
-    sys_output("[*] unpacking completed\n");
+    if (verbose)
+    {
+        sys_output("[*] unpacking completed\n");
+    }
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
     {
-        sys_output("[*] creating sce_sys/package/head.bin\n");
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/head.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
         out_add_parent(path);
 
@@ -1003,7 +1044,10 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        sys_output("[*] creating sce_sys/package/tail.bin\n");
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/tail.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
         out_begin_file(path, 0);
@@ -1018,7 +1062,10 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        sys_output("[*] creating sce_sys/package/stat.bin\n");
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/stat.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
@@ -1031,17 +1078,26 @@ int main(int argc, char* argv[])
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
-            sys_output("[*] creating RO/License\n");
+            if (verbose)
+            {
+                sys_output("[*] creating RO/License\n");
+            }
             snprintf(path, sizeof(path), "%s/RO/License", root);
             out_add_folder(path);
 
-            sys_output("[*] creating RO/License/FAKE.rif\n");
+            if (verbose)
+            {
+                sys_output("[*] creating RO/License/FAKE.rif\n");
+            }
             snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
         }
         else if (type == PKG_TYPE_PSX)
         {
             //For Pocketstation
-            sys_output("[*] creating rif");
+            if (verbose)
+            {
+                sys_output("[*] creating rif");
+            }
             const char* rif_contentid = (char*)rif + 0x10;
             snprintf(path, sizeof(path), "pspemu/PSP/LICENSE");
             out_add_folder(path);
@@ -1049,7 +1105,10 @@ int main(int argc, char* argv[])
         }
         else
         {
-            sys_output("[*] creating sce_sys/package/work.bin\n");
+            if (verbose)
+            {
+                sys_output("[*] creating sce_sys/package/work.bin\n");
+            }
             snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
         }
 
@@ -1091,20 +1150,29 @@ int main(int argc, char* argv[])
         memcpy(pdb+0x16C,id,0x09);
 
         pdb[0x20] = 0x02;
-        sys_output("[*] creating d0.pdb\n");
+        if (verbose)
+        {
+            sys_output("[*] creating d0.pdb\n");
+        }
         snprintf(path, sizeof(path), "%s/d0.pdb", root);
         out_begin_file(path,0);
         out_write(pdb,sizeof(pdb));
         out_end_file();
 
         pdb[0x20] = 0x00;
-        sys_output("[*] creating d1.pdb\n");
+        if (verbose)
+        {
+            sys_output("[*] creating d1.pdb\n");
+        }
         snprintf(path, sizeof(path), "%s/d1.pdb", root);
         out_begin_file(path,0);
         out_write(pdb,sizeof(pdb));
         out_end_file();
 
-        sys_output("[*] creating f0.pdb\n");
+        if (verbose)
+        {
+            sys_output("[*] creating f0.pdb\n");
+        }
         snprintf(path, sizeof(path), "%s/f0.pdb", root);
         out_begin_file(path,0);
         out_write(pdb,0);
@@ -1113,29 +1181,47 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_VITA_PSM)
     {
-        sys_output("[*] creating RW\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW\n");
+        }
         snprintf(path, sizeof(path), "%s/RW", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/Documents\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/Documents\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/Documents", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/Temp\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/Temp\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/Temp", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/System\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/System/content_id\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System/content_id\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System/content_id", root);
         out_begin_file(path, 0);
         out_write(pkg_header + 0x30, 0x30);
         out_end_file();
 
-        sys_output("[*] creating RW/System/pm.dat\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System/pm.dat\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System/pm.dat", root);
 
         uint8_t pm[1 << 16] = { 0 };
@@ -1146,11 +1232,13 @@ int main(int argc, char* argv[])
 
     out_end();
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
+    if (verbose)
     {
-        sys_output("[*] minimum fw version required: %s\n", min_version);
+        if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
+        {
+            sys_output("[*] minimum fw version required: %s\n", min_version);
+        }
+        sys_output("[*] done!\n");
     }
-
-    sys_output("[*] done!\n");
     sys_output_done();
 }
