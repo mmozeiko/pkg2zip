@@ -103,7 +103,8 @@ If this repository is enabled, just install pkg2zip with zypper.
 
 # Building
 
-Execute `make` if you are on GNU/Linux or macOS.
+Execute `make` if you are on GNU/Linux or macOS (gcc comiler required)
+To install the resulting file use `make "install` as root
 
 On Windows you can build either with MinGW (get [MinGW-w64][]) or [Visual Studio 2017 Community Edition][vs2017ce].
 * for MinGW make sure you have make installed, and then execute `mingw32-make`
