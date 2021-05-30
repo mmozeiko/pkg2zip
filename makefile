@@ -24,9 +24,9 @@ debug: LDFLAGS += -g
 all: ${BIN}
 
 install:
-	install -o root -g root -m 0755 ${BIN} $(DESTDIR)$(BINDIR)/${BIN}
-	install -o root -g root -m 0755 rif2zrif.py $(DESTDIR)$(BINDIR)/rif2zrif
-	install -o root -g root -m 0755 zrif2rif.py $(DESTDIR)$(BINDIR)/zrif2rif
+	install -D -m 0755 ${BIN} $(DESTDIR)$(BINDIR)/${BIN}
+	install -D -m 0755 rif2zrif.py $(DESTDIR)$(BINDIR)/rif2zrif
+	install -D -m 0755 zrif2rif.py $(DESTDIR)$(BINDIR)/zrif2rif
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/${BIN}
