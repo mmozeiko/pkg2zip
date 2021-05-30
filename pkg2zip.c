@@ -266,12 +266,32 @@ static const char* get_region(const char* id)
     }
 }
 
+void print_help(char* bin_name)
+{
+    sys_output("Parameters:\n");
+    sys_output("\n");
+    sys_output("-x|--extract       Extract only. No zip compression\n");
+    sys_output("-l|--list          Shows the package (sfo) name and exits\n");
+    sys_output("-b|--no-bgdl       Disable bgdl output for VITA Theme extraction\n");
+    sys_output("-q|--quiet         Do not output anything to stdout\n");
+    sys_output("-h|--help          Shows this help message\n");
+    sys_output("\n");
+    sys_output("PSP/PSX only options:\n");
+    sys_output("-c[NUM]            Create a *.CSO file instead of ISO. [NUM] is the compression ratio\n");
+    sys_output("-p|--psp           Extracts PSP files in their original EBOOT.PBP format\n");
+    sys_output("-d|--decrypt       Always decrypt PSP DLC/EDAT files\n");
+    sys_output("\n");
+    sys_output("Usage: %s [-x] [-c[N]] [-b] [-p] <file.pkg> [zRIF]\n", bin_name);
+}
+
 typedef enum {
     PKG_TYPE_VITA_APP,
     PKG_TYPE_VITA_DLC,
     PKG_TYPE_VITA_PATCH,
     PKG_TYPE_VITA_PSM,
+    PKG_TYPE_VITA_THEME,
     PKG_TYPE_PSP,
+    PKG_TYPE_PSP_THEME,
     PKG_TYPE_PSX,
 } pkg_type;
 
@@ -281,18 +301,23 @@ int main(int argc, char* argv[])
 
     int zipped = 1;
     int listing = 0;
+    int verbose = 1;
     int cso = 0;
+    int pbp = 0;
+    int ddlc = 0;
+    int bgdl = 1;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
     for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "-x") == 0)
+        if (strcmp(argv[i], "-x") == 0 || strcmp(argv[i], "--extract") == 0)
         {
             zipped = 0;
         }
-        else if (strcmp(argv[i], "-l") == 0)
+        else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--list") == 0)
         {
             listing = 1;
+            verbose = 0;
         }
         else if (strncmp(argv[i], "-c", 2) == 0)
         {
@@ -302,11 +327,37 @@ int main(int argc, char* argv[])
                 cso = cso > 9 ? 9 : cso < 0 ? 0 : cso;
             }
         }
+        else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--psp") == 0)
+        {
+            pbp = 1;
+        }
+        else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decrypt") == 0)
+        {
+            ddlc = 1;
+        }
+        else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--no-bgdl") == 0)
+        {
+            bgdl = 0;
+        }
+        else if (strcmp(argv[i], "-q") == 0 || strcmp(argv[i], "--quiet") == 0)
+        {
+            verbose = 0;
+        }
+        else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        {
+            sys_output("pkg2zip v2.3\n");
+            sys_output("\n");
+            print_help(argv[0]);
+            exit(0);
+        }
         else
         {
-            if (pkg_arg != NULL)
+            if (pkg_arg != NULL )
             {
-                zrif_arg = argv[i];
+                if(strlen(argv[i]) != 0)
+                {
+                    zrif_arg = argv[i];
+                }
                 break;
             }
             else
@@ -315,17 +366,19 @@ int main(int argc, char* argv[])
             }
         }
     }
-    if (listing == 0)
-    {
-        sys_output("pkg2zip v1.8\n");
-    }
     if (pkg_arg == NULL)
     {
         fprintf(stderr, "ERROR: no pkg file specified\n");
-        sys_error("Usage: %s [-x] [-l] [-c[N]] file.pkg [zRIF]\n", argv[0]);
+        print_help(argv[0]);
+        exit(1);
     }
 
-    if (listing == 0)
+    if (verbose)
+    {
+        sys_output("pkg2zip v2.3\n");
+    }
+
+    if (verbose)
     {
         sys_output("[*] loading...\n");
     }
@@ -359,12 +412,13 @@ int main(int argc, char* argv[])
     {
         sys_error("ERROR: pkg file is too small\n");
     }
-
+    
     uint32_t content_type = 0;
     uint32_t sfo_offset = 0;
     uint32_t sfo_size = 0;
     uint32_t items_offset = 0;
     uint32_t items_size = 0;
+    char install_directory[0x28] = {0};
 
     for (uint32_t i = 0; i < meta_count; i++)
     {
@@ -388,6 +442,11 @@ int main(int argc, char* argv[])
             sfo_offset = get32be(block + 8);
             sfo_size = get32be(block + 12);
         }
+        else if (type == 10)
+        {
+            sys_read(pkg, meta_offset + 8 + 8, install_directory,sizeof(install_directory));
+            //sys_output("[*] DLC Install Directory: %s\n", install_directory);
+        }
 
         meta_offset += 2 * sizeof(uint32_t) + size;
     }
@@ -401,8 +460,12 @@ int main(int argc, char* argv[])
     }
     else if (content_type == 7 || content_type == 0xe || content_type == 0xf || content_type == 0x10)
     {
-        // PSP & PSP-PCEngine / PSP-Go / PSP-Mini / PSP-NeoGeo
+        // PSP & PSP-PCEngine & DLC / PSP-Go / PSP-Mini / PSP-NeoGeo 
         type = PKG_TYPE_PSP;
+    }
+    else if (content_type == 0x9)
+    {
+        type = PKG_TYPE_PSP_THEME;
     }
     else if (content_type == 0x15)
     {
@@ -415,6 +478,10 @@ int main(int argc, char* argv[])
     else if (content_type == 0x18 || content_type == 0x1d)
     {
         type = PKG_TYPE_VITA_PSM;
+    }
+    else if (content_type ==  0x1f)
+    {
+        type = PKG_TYPE_VITA_THEME;
     }
     else
     {
@@ -467,6 +534,46 @@ int main(int argc, char* argv[])
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
+
+        if (type == PKG_TYPE_PSX && zrif_arg != NULL)  //pocketstation pkg type is PSX
+        {
+            rif_size = 512;
+            zrif_decode(zrif_arg, rif, rif_size);
+        }
+    }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+
+        id = (char*)pkg_header + 0x37;
+        memcpy(title, pkg_header + 0x44, 0x10);
+
+        uint8_t item[32];
+        sys_read(pkg, enc_offset + items_offset, item, sizeof(item));
+        aes128_ctr_xor(&key, iv, items_offset / 16, item, sizeof(item));
+
+        uint64_t data_offset = get64be(item + 8);
+        uint64_t data_size = get64be(item + 16);
+        uint8_t psp_type = item[24];
+
+        assert(data_offset % 16 == 0);
+
+        if (pkg_size < enc_offset + data_offset + data_size)
+        {
+            sys_error("ERROR: pkg file is too short, possibly corrupted\n");
+        }
+
+        const aes128_key* item_key;
+        item_key = psp_type == 0x90 ? &key : &ps3_key;
+        get_psp_theme_title(title,item_key, iv, pkg, enc_offset, data_offset);
+
+        //Theme names are prone to having colons
+        for (uint32_t i = 0; i < sizeof(title); i++)
+        {
+            if (title[i] == 58)
+            {
+                title[i] = 32;
+            }
+        }
     }
     else // Vita
     {
@@ -474,6 +581,11 @@ int main(int argc, char* argv[])
         {
             memcpy(content, pkg_header + 0x30, 0x30);
             rif_size = 1024;
+        }
+        else if (type == PKG_TYPE_VITA_THEME)
+        {
+            parse_sfo(pkg, sfo_offset, sfo_size, category, title, content, min_version, pkg_version);
+            rif_size = 512;
         }
         else // Vita APP, DLC or PATCH
         {
@@ -505,22 +617,30 @@ int main(int argc, char* argv[])
         const char* type_str;
         if (content_type == 7)
         {
-            type_str = (strcmp(category, "HG") == 0) ? "PSP-PCEngine" : "PSP";
+            type_str = (strcmp(category, "HG") == 0) ? "PSP-PCEngine" : install_directory[0] != 0 ? "PSP-DLC" :"PSP";
         }
         else
         {
             type_str = content_type == 0xe ? "PSP-Go" : content_type == 0xf ? "PSP-Mini" : "PSP-NeoGeo";
         }
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, type_str, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking %s\n", type_str);
+        }
+    }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [PSP-Theme]%s", title, id, ext);
+        if (verbose)
+        {
+            sys_output("[*] unpacking PSP Theme\n");
         }
     }
     else if (type == PKG_TYPE_PSX)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking PSX\n");
         }
@@ -528,7 +648,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita DLC\n");
         }
@@ -536,7 +656,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_PATCH)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [PATCH] [v%s]%s", title, id, get_region(id), pkg_version, ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita PATCH\n");
         }
@@ -544,7 +664,7 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_PSM)
     {
         snprintf(root, sizeof(root), "%.9s [%s] [PSM]%s", id, get_region(id), ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita PSM\n");
         }
@@ -552,9 +672,17 @@ int main(int argc, char* argv[])
     else if (type == PKG_TYPE_VITA_APP)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
-        if (listing == 0)
+        if (verbose)
         {
             sys_output("[*] unpacking Vita APP\n");
+        }
+    }
+    else if (type == PKG_TYPE_VITA_THEME)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [%s]%s", title, id, get_region(id), ext);
+        if (verbose)
+        {
+            sys_output("[*] unpacking Vita theme\n");
         }
     }
     else
@@ -573,7 +701,8 @@ int main(int argc, char* argv[])
         sys_error("ERROR: Listing option without creating zip is useless\n");
     }
 
-    if (zipped)
+
+    if (verbose)
     {
         sys_output("[*] creating '%s' archive\n", root);
     }
@@ -583,37 +712,15 @@ int main(int argc, char* argv[])
 
     if (type == PKG_TYPE_PSP)
     {
-        snprintf(root, sizeof(root), "pspemu/ISO");
-        out_add_folder(root);
-
-        if (content_type == 7 && strcmp(category, "HG") == 0)
-        {
-            snprintf(root, sizeof(root), "pspemu");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/PSP");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/GAME");
-            out_add_folder(root);
-
-            sys_vstrncat(root, sizeof(root), "/%.9s", id);
-            out_add_folder(root);
-        }
+        snprintf(root, sizeof(root), "pspemu/PSP/GAME/%.9s", id);
+    }
+    else if (type == PKG_TYPE_PSP_THEME)
+    {
+        snprintf(root, sizeof(root), "pspemu/PSP/THEME");
     }
     else if (type == PKG_TYPE_PSX)
     {
-        sys_vstrncat(root, sizeof(root), "pspemu");
-        out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/PSP");
-        out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/GAME");
-        out_add_folder(root);
-
-        sys_vstrncat(root, sizeof(root), "/%.9s", id);
-        out_add_folder(root);
+        snprintf(root, sizeof(root), "pspemu/PSP/GAME/%.9s", id);
     }
     else if (type == PKG_TYPE_VITA_DLC)
     {
@@ -650,6 +757,42 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
     }
+    else if (type == PKG_TYPE_VITA_THEME)
+    {
+
+        if (bgdl == 1)
+        {
+            sys_vstrncat(root, sizeof(root), "bgdl/t");
+            out_add_folder(root);
+
+            uint32_t bgdl_task = 0;
+            char dir[1024] = {0};
+            if(zipped == 0)
+            {
+                do 
+                {
+                    bgdl_task++;
+                    snprintf(dir, sizeof(dir), "%s/%08x",root, bgdl_task);
+                } 
+                while (sys_test_dir(dir));
+            }
+            else
+            {
+                bgdl_task = 1;
+            }
+
+            sys_vstrncat(root,sizeof(root), "/%08x", bgdl_task);
+            out_add_folder(root);
+        }
+        else 
+        {
+            sys_vstrncat(root, sizeof(root), "app");
+            out_add_folder(root);
+        }
+
+        sys_vstrncat(root, sizeof(root), "/%.9s", id);
+        out_add_folder(root);
+    }
     else
     {
         assert(0);
@@ -657,8 +800,6 @@ int main(int argc, char* argv[])
     }
 
     char path[1024];
-
-    int sce_sys_package_created = 0;
 
     sys_output_progress_init(pkg_size);
 
@@ -691,7 +832,7 @@ int main(int argc, char* argv[])
         }
 
         const aes128_key* item_key;
-        if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
+        if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX || type == PKG_TYPE_PSP_THEME)
         {
             item_key = psp_type == 0x90 ? &key : &ps3_key;
         }
@@ -707,7 +848,7 @@ int main(int argc, char* argv[])
 
         // sys_output("[%u/%u] %s\n", item_index + 1, item_count, name);
 
-        if (flags == 4 || flags == 18)
+        if (flags == 4 || flags == 18) // Directory
         {
             if (type == PKG_TYPE_VITA_PSM)
             {
@@ -715,33 +856,34 @@ int main(int argc, char* argv[])
                 char* slash = strchr(name, '/');
                 if (slash != NULL)
                 {
-                    snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                    if (strstr(name, "runtime"))
+                    {
+                        snprintf(path, sizeof(path), "%s/%s", root, name + 9);
+                    }
+                    else
+                    {
+                        snprintf(path, sizeof(path), "%s/RO/%s", root, name + 9);
+                    }
                     out_add_folder(path);
                 }
             }
-            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+            else if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
             {
                 snprintf(path, sizeof(path), "%s/%s", root, name);
                 out_add_folder(path);
-
-                if (strcmp("sce_sys/package", name) == 0)
-                {
-                    sce_sys_package_created = 1;
-                }
             }
+            // sys_output("dir : %s\n", path);
         }
-        else
+        else // File
         {
             int decrypt = 1;
-            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH) && strcmp("sce_sys/package/digs.bin", name) == 0)
+            if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME) && (strcmp("sce_sys/package/digs.bin", name) == 0 || strcmp("sce_sys/package/cert.bin", name) == 0 ))
             {
-                // TODO: is this really needed?
-                if (!sce_sys_package_created)
+                snprintf(path, sizeof(path), "%s/sce_sys/package", root);
+                out_add_folder(path);
+                if (verbose)
                 {
-                    snprintf(path, sizeof(path), "%s/sce_sys/package", root);
-                    out_add_folder(path);
-
-                    sce_sys_package_created = 1;
+                    sys_output("[*] renaming %s to body.bin\n", name);
                 }
                 snprintf(name, sizeof(name), "%s", "sce_sys/package/body.bin");
                 decrypt = 0;
@@ -751,11 +893,17 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/DOCUMENT.DAT", root);
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCUMENT.DAT", id);
                 }
                 else if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "%s/EBOOT.PBP", root);
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/KEYS.BIN", id);
+                    unpack_keys_bin(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/EBOOT.PBP", id);
+                }
+                else if (strcmp("USRDIR/CONTENT/texture.enc", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "ps1emu/%.9s/texture.enc", id);
                 }
                 else
                 {
@@ -766,29 +914,90 @@ int main(int argc, char* argv[])
             {
                 if (strcmp("USRDIR/CONTENT/EBOOT.PBP", name) == 0)
                 {
-                    snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
-                    unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);
-                    continue;
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/EBOOT.PBP", id);
+                    if (!pbp)
+                    {
+                        snprintf(path, sizeof(path), "pspemu/ISO/%s [%.9s].%s", title, id, cso ? "cso" : "iso");
+                        out_add_parent(path);
+                        unpack_psp_eboot(path, item_key, iv, pkg, enc_offset, data_offset, data_size, cso);
+                        continue;
+                    }
+                }
+                else if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCUMENT.DAT", id);
+                    if (!pbp)
+                    {
+                        continue;
+                    }
+                }
+                else if (strcmp("USRDIR/CONTENT/DOCINFO.EDAT", name) == 0)
+                {
+                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/DOCINFO.EDAT", id);
+                    if (!pbp)
+                    {
+                        continue;
+                    }
                 }
                 else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)
                 {
                     snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/PSP-KEY.EDAT", id);
-                    unpack_psp_key(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
-                    continue;
+                    if (!pbp || ddlc)
+                    {
+                        out_add_parent(path);
+                        unpack_psp_key(path, item_key, iv, pkg, enc_offset, data_offset, data_size);						
+                        continue;
+                    }
                 }
-                else if (strcmp("USRDIR/CONTENT/CONTENT.DAT", name) == 0)
+                else if (strstr(name, "USRDIR/CONTENT"))
                 {
-                    snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/CONTENT.DAT", id);
+                    // skip "USRDIR/CONTENT" prefix
+                    char* slash = strchr(name+14, '/');
+                    if (slash != NULL)
+                    {
+                        snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/%s", id, name+15);
+                        char* edat = strrchr(name, '.');
+                        if (edat != NULL)
+                        {
+                            if (strcmp(edat, ".edat") == 0 || strcmp(edat, ".EDAT") == 0)
+                            {
+                                if (!pbp || ddlc)
+                                {
+                                    out_add_parent(path);
+                                    unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
                 else
                 {
                     continue;
                 }
             }
+            else if (type == PKG_TYPE_PSP_THEME)
+            {
+                snprintf(path, sizeof(path), "pspemu/PSP/THEME/%s", name);
+                out_add_parent(path);
+                unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                continue;
+            }
             else if (type == PKG_TYPE_VITA_PSM)
             {
                 // skip "content/" prefix
-                snprintf(path, sizeof(path), "%s/RO/%s", root, name + 8);
+                if (strstr(name, "runtime"))
+                {
+                   snprintf(path, sizeof(path), "%s/%s", root, name + 9);
+                }
+                else
+                {
+                   snprintf(path, sizeof(path), "%s/RO/%s", root, name + 9);
+                }
             }
             else
             {
@@ -796,7 +1005,7 @@ int main(int argc, char* argv[])
             }
 
             uint64_t offset = data_offset;
-
+            out_add_parent(path);
             out_begin_file(path, 0);
             while (data_size != 0)
             {
@@ -818,19 +1027,19 @@ int main(int argc, char* argv[])
         }
     }
 
-    sys_output("[*] unpacking completed\n");
-
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH)
+    if (verbose)
     {
-        if (!sce_sys_package_created)
-        {
-            sys_output("[*] creating sce_sys/package\n");
-            snprintf(path, sizeof(path), "%s/sce_sys/package", root);
-            out_add_folder(path);
-        }
+        sys_output("[*] unpacking completed\n");
+    }
 
-        sys_output("[*] creating sce_sys/package/head.bin\n");
+    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
+    {
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/head.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/head.bin", root);
+        out_add_parent(path);
 
         out_begin_file(path, 0);
         uint64_t head_size = enc_offset + items_size;
@@ -846,7 +1055,10 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        sys_output("[*] creating sce_sys/package/tail.bin\n");
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/tail.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/tail.bin", root);
 
         out_begin_file(path, 0);
@@ -861,7 +1073,10 @@ int main(int argc, char* argv[])
         }
         out_end_file();
 
-        sys_output("[*] creating sce_sys/package/stat.bin\n");
+        if (verbose)
+        {
+            sys_output("[*] creating sce_sys/package/stat.bin\n");
+        }
         snprintf(path, sizeof(path), "%s/sce_sys/package/stat.bin", root);
 
         uint8_t stat[768] = { 0 };
@@ -870,20 +1085,41 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
-    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM) && zrif_arg != NULL)
+    if ((type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PSM || type == PKG_TYPE_VITA_THEME || type == PKG_TYPE_PSX) && zrif_arg != NULL)
     {
         if (type == PKG_TYPE_VITA_PSM)
         {
-            sys_output("[*] creating RO/License\n");
+            if (verbose)
+            {
+                sys_output("[*] creating RO/License\n");
+            }
             snprintf(path, sizeof(path), "%s/RO/License", root);
             out_add_folder(path);
 
-            sys_output("[*] creating RO/License/FAKE.rif\n");
+            if (verbose)
+            {
+                sys_output("[*] creating RO/License/FAKE.rif\n");
+            }
             snprintf(path, sizeof(path), "%s/RO/License/FAKE.rif", root);
+        }
+        else if (type == PKG_TYPE_PSX)
+        {
+            //For Pocketstation
+            if (verbose)
+            {
+                sys_output("[*] creating rif");
+            }
+            const char* rif_contentid = (char*)rif + 0x10;
+            snprintf(path, sizeof(path), "pspemu/PSP/LICENSE");
+            out_add_folder(path);
+            snprintf(path, sizeof(path), "pspemu/PSP/LICENSE/%s.rif", rif_contentid);
         }
         else
         {
-            sys_output("[*] creating sce_sys/package/work.bin\n");
+            if (verbose)
+            {
+                sys_output("[*] creating sce_sys/package/work.bin\n");
+            }
             snprintf(path, sizeof(path), "%s/sce_sys/package/work.bin", root);
         }
 
@@ -892,31 +1128,111 @@ int main(int argc, char* argv[])
         out_end_file();
     }
 
+    if (type == PKG_TYPE_VITA_THEME && bgdl == 1)
+    {
+        //get the parent directory
+        char* lastslash = strrchr(root, '/');
+        if (lastslash != NULL)
+        {
+            root[strlen(root)-strlen(lastslash)] = 0;
+        }
+        uint8_t pdb[0x200] = { 0 };
+        //PDB entries :: https://www.psdevwiki.com/ps3/Project_Database_(PDB)
+        memcpy(pdb+0x04,"\x64\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10);
+        memcpy(pdb+0x14,"\x65\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // 02 in d0.pdb, 00 in d1.pdb 
+        memcpy(pdb+0x24,"\x66\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);             // "Task unregister auto"
+        memcpy(pdb+0x31,"\x68\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // unknown but required
+        memcpy(pdb+0x41,"\x6B\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x0C\x00\x00\x00",0x10); // "Task Subtype"
+        memcpy(pdb+0x51,"\x6C\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x01\x00\x00\x00",0x10); // unknown but required 
+        memcpy(pdb+0x61,"\x6D\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00",0x10); // unknown but required 
+        memcpy(pdb+0x71,"\x6E\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0x7E,"\x6F\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10); // unknown but required
+        memcpy(pdb+0x8E,"\x70\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);
+        memcpy(pdb+0x9B,"\x71\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);
+        memcpy(pdb+0xA8,"\x72\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00",0x10);
+        memcpy(pdb+0xB8,"\x73\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0xC5,"\x74\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00",0x0D);
+        memcpy(pdb+0xD2,"\x69\x00\x00\x00\x44\x00\x00\x00\x44\x00\x00\x00",0x0C);                 //pkg title
+        memcpy(pdb+0xDE,title,0x40);
+        memcpy(pdb+0x122,"\xD9\x00\x00\x00\x25\x00\x00\x00\x25\x00\x00\x00",0x0C);                 //ContentID
+        memcpy(pdb+0x12E,id,0x25);
+        memcpy(pdb+0x153,"\xDA\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01",0x0D);            // Download Complete Flag
+        memcpy(pdb+0x160,"\xDC\x00\x00\x00\x0A\x00\x00\x00\x0A\x00\x00\x00",0x0C);                //Content ID 
+        memcpy(pdb+0x16C,id,0x09);
+
+        pdb[0x20] = 0x02;
+        if (verbose)
+        {
+            sys_output("[*] creating d0.pdb\n");
+        }
+        snprintf(path, sizeof(path), "%s/d0.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,sizeof(pdb));
+        out_end_file();
+
+        pdb[0x20] = 0x00;
+        if (verbose)
+        {
+            sys_output("[*] creating d1.pdb\n");
+        }
+        snprintf(path, sizeof(path), "%s/d1.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,sizeof(pdb));
+        out_end_file();
+
+        if (verbose)
+        {
+            sys_output("[*] creating f0.pdb\n");
+        }
+        snprintf(path, sizeof(path), "%s/f0.pdb", root);
+        out_begin_file(path,0);
+        out_write(pdb,0);
+        out_end_file();
+    }
+
     if (type == PKG_TYPE_VITA_PSM)
     {
-        sys_output("[*] creating RW\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW\n");
+        }
         snprintf(path, sizeof(path), "%s/RW", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/Documents\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/Documents\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/Documents", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/Temp\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/Temp\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/Temp", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/System\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System", root);
         out_add_folder(path);
 
-        sys_output("[*] creating RW/System/content_id\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System/content_id\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System/content_id", root);
         out_begin_file(path, 0);
         out_write(pkg_header + 0x30, 0x30);
         out_end_file();
 
-        sys_output("[*] creating RW/System/pm.dat\n");
+        if (verbose)
+        {
+            sys_output("[*] creating RW/System/pm.dat\n");
+        }
         snprintf(path, sizeof(path), "%s/RW/System/pm.dat", root);
 
         uint8_t pm[1 << 16] = { 0 };
@@ -927,11 +1243,13 @@ int main(int argc, char* argv[])
 
     out_end();
 
-    if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
+    if (verbose)
     {
-        sys_output("[*] minimum fw version required: %s\n", min_version);
+        if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_PATCH)
+        {
+            sys_output("[*] minimum fw version required: %s\n", min_version);
+        }
+        sys_output("[*] done!\n");
     }
-
-    sys_output("[*] done!\n");
     sys_output_done();
 }
