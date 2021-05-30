@@ -279,6 +279,7 @@ void print_help(char* bin_name)
     sys_output("PSP/PSX only options:\n");
     sys_output("-c[NUM]            Create a *.CSO file instead of ISO. [NUM] is the compression ratio\n");
     sys_output("-p|--psp           Extracts PSP files in their original EBOOT.PBP format\n");
+    sys_output("-d|--decrypt       Always decrypt PSP DLC/EDAT files\n");
     sys_output("\n");
     sys_output("Usage: %s [-x] [-c[N]] [-b] [-p] <file.pkg> [zRIF]\n", bin_name);
 }
@@ -303,6 +304,7 @@ int main(int argc, char* argv[])
     int verbose = 1;
     int cso = 0;
     int pbp = 0;
+    int ddlc = 0;
     int bgdl = 1;
     const char* pkg_arg = NULL;
     const char* zrif_arg = NULL;
@@ -329,6 +331,10 @@ int main(int argc, char* argv[])
         {
             pbp = 1;
         }
+        else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--decrypt") == 0)
+        {
+            ddlc = 1;
+        }
         else if (strcmp(argv[i], "-b") == 0 || strcmp(argv[i], "--no-bgdl") == 0)
         {
             bgdl = 0;
@@ -339,7 +345,7 @@ int main(int argc, char* argv[])
         }
         else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
-            sys_output("pkg2zip v2.2\n");
+            sys_output("pkg2zip v2.3\n");
             sys_output("\n");
             print_help(argv[0]);
             exit(0);
@@ -369,7 +375,7 @@ int main(int argc, char* argv[])
 
     if (verbose)
     {
-        sys_output("pkg2zip v2.2\n");
+        sys_output("pkg2zip v2.3\n");
     }
 
     if (verbose)
@@ -936,7 +942,7 @@ int main(int argc, char* argv[])
                 else if (strcmp("USRDIR/CONTENT/PSP-KEY.EDAT", name) == 0)
                 {
                     snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/PSP-KEY.EDAT", id);
-                    if (!pbp)
+                    if (!pbp || ddlc)
                     {
                         out_add_parent(path);
                         unpack_psp_key(path, item_key, iv, pkg, enc_offset, data_offset, data_size);						
@@ -950,15 +956,17 @@ int main(int argc, char* argv[])
                     if (slash != NULL)
                     {
                         snprintf(path, sizeof(path), "pspemu/PSP/GAME/%.9s/%s", id, name+15);
-
                         char* edat = strrchr(name, '.');
                         if (edat != NULL)
                         {
                             if (strcmp(edat, ".edat") == 0 || strcmp(edat, ".EDAT") == 0)
                             {
-                                out_add_parent(path);
-                                unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
-                                continue;
+                                if (!pbp || ddlc)
+                                {
+                                    out_add_parent(path);
+                                    unpack_psp_edat(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                                    continue;
+                                }
                             }
                         }
                     }
