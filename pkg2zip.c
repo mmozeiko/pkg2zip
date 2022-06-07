@@ -923,7 +923,7 @@ int main(int argc, char* argv[])
             }
 
             if (type == PKG_TYPE_PS3) {
-                char game[ZIP_MAX_FILENAME];
+                char game[10]; // ABCD12345
                 strncpy(game, &name[0], 9);
                 game[9] = '\0';
                 if (strstr(name, "DOCUMENT.DAT") != NULL) {
@@ -931,10 +931,8 @@ int main(int argc, char* argv[])
                 } else if (strstr(name, "EBOOT.PBP") != NULL) {
                     sprintf(path, "pspemu/PSP/GAME/%s", game);
                     out_add_folder(path);
-                    /*
                     sprintf(path, "pspemu/PSP/GAME/%s/KEYS.BIN", game);
                     unpack_keys_bin(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
-                    */
                     sprintf(path, "pspemu/PSP/GAME/%s/EBOOT.PBP", game);
                 } else {
                     continue;
