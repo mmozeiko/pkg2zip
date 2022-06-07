@@ -460,7 +460,11 @@ int main(int argc, char* argv[])
     pkg_type type;
 
     // http://www.psdevwiki.com/ps3/PKG_files
-    if (content_type == 6)
+    if (content_type == 1)
+    {
+        type = PKG_TYPE_PS3;
+    }
+    else if (content_type == 6)
     {
         type = PKG_TYPE_PSX;
     }
