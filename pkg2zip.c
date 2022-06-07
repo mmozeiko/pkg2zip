@@ -236,33 +236,33 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
     }
 }
 
-static const char* get_region(const char* id)
-{
-    if (memcmp(id, "PCSE", 4) == 0 || memcmp(id, "PCSA", 4) == 0 ||
-        memcmp(id, "NPNA", 4) == 0)
-    {
-        return "USA";
-    }
-    else if (memcmp(id, "PCSF", 4) == 0 || memcmp(id, "PCSB", 4) == 0 ||
-             memcmp(id, "NPOA", 4) == 0)
-    {
+static const char* get_region(const char* id) {
+    if (memcmp(id, "NPEE", 4) == 0 || memcmp(id, "NPEF", 4) == 0 || // PS1 EUR
+        memcmp(id, "PCSB", 4) == 0 || memcmp(id, "PCSF", 4) == 0 || // PSV EUR
+        memcmp(id, "NPOA", 4) == 0) { // PSM EUR
         return "EUR";
     }
-    else if (memcmp(id, "PCSC", 4) == 0 || memcmp(id, "VCJS", 4) == 0 || 
-             memcmp(id, "PCSG", 4) == 0 || memcmp(id, "VLJS", 4) == 0 ||
-             memcmp(id, "VLJM", 4) == 0 || memcmp(id, "NPPA", 4) == 0)
-    {
-        return "JPN";
-    }
-    else if (memcmp(id, "VCAS", 4) == 0 || memcmp(id, "PCSH", 4) == 0 ||
-             memcmp(id, "VLAS", 4) == 0 || memcmp(id, "PCSD", 4) == 0 ||
-             memcmp(id, "NPQA", 4) == 0)
-    {
+    else if (memcmp(id, "NPHI", 4) == 0 || memcmp(id, "NPHJ", 4) == 0 || // PS1 ASA
+             memcmp(id, "PCSD", 4) == 0 || memcmp(id, "PCSH", 4) == 0 || // PSV ASA
+             memcmp(id, "NPQA", 4) == 0) { // PSM ASA
         return "ASA";
     }
-    else
-    {
-        return "unknown region";
+    else if (memcmp(id, "NPJI", 4) == 0 || memcmp(id, "NPJJ", 4) == 0 || // PS1 JPN
+             memcmp(id, "PCSC", 4) == 0 || memcmp(id, "PCSG", 4) == 0 || // PSV JPN
+             memcmp(id, "NPPA", 4) == 0) { // PSM JPN
+        return "JPN";
+    }
+    else if (memcmp(id, "NPUF", 4) == 0 || memcmp(id, "NPUH", 4) == 0 || // PS1 USA
+             memcmp(id, "NPUI", 4) == 0 || memcmp(id, "NPUJ", 4) == 0 || // PS1 USA
+             memcmp(id, "PCSA", 4) == 0 || memcmp(id, "PCSE", 4) == 0 || // PSV USA
+             memcmp(id, "NPNA", 4) == 0) { // PSM USA
+        return "USA";
+    }
+    else if (memcmp(id, "PCSI", 4) == 0) { // PSV INT
+        return "INT";
+    }
+    else {
+        return "UNK";
     }
 }
 
@@ -639,7 +639,7 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_PSX)
     {
-        snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PSX]%s", title, id, get_region(id), ext);
         if (verbose)
         {
             sys_output("[*] unpacking PSX\n");
