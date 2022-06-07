@@ -728,10 +728,12 @@ int main(int argc, char* argv[])
         sys_error("ERROR: Listing option without creating zip is useless\n");
     }
 
-
     if (verbose)
     {
-        sys_output("[*] creating '%s' archive\n", root);
+        if (zipped)
+            sys_output("[*] creating '%s' archive\n", root);
+        else
+            sys_output("[*] unpacking '%s' to directory\n", root);
     }
 
     out_begin(root, zipped);
@@ -1060,7 +1062,10 @@ int main(int argc, char* argv[])
 
     if (verbose)
     {
-        sys_output("[*] unpacking completed\n");
+        if (zipped)
+            sys_output("[*] creating completed\n");
+        else
+            sys_output("[*] unpacking completed\n");
     }
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
