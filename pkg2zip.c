@@ -400,7 +400,7 @@ int main(int argc, char* argv[])
 
     // https://www.psdevwiki.com/ps3/PKG_files#Header
     
-    uint16_t hrd_type = get16be(pkg_header + 6);
+    uint16_t hdr_type = get16be(pkg_header + 6);
     uint64_t meta_offset = get32be(pkg_header + 8); // why uint64_t?
     uint32_t meta_count = get32be(pkg_header + 12);
     uint32_t item_count = get32be(pkg_header + 20);
@@ -517,6 +517,11 @@ int main(int argc, char* argv[])
         aes128_init(&key, pkg_vita_3);
         aes128_ecb_encrypt(&key, iv, main_key);
     }
+    else if ((key_type == 4) && (hdr_type == 1)) // PKG_TYPE_PS3
+    {
+        memcpy(main_key, pkg_ps3_key, sizeof(main_key));
+        aes128_init(&ps3_key, pkg_ps3_key);
+    }
     else if (key_type == 4)
     {
         aes128_key key;
@@ -540,7 +545,12 @@ int main(int argc, char* argv[])
     uint8_t rif[1024];
     uint32_t rif_size = 0;
 
-    if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
+    if (type == PKG_TYPE_PS3) {
+        // there is no PARAM.SFO inside
+        id = (char*)pkg_header + 0x37;
+        sprintf(title, "%s", id);
+    }
+    else if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
@@ -553,7 +563,6 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_PSP_THEME)
     {
-
         id = (char*)pkg_header + 0x37;
         memcpy(title, pkg_header + 0x44, 0x10);
 
@@ -574,7 +583,7 @@ int main(int argc, char* argv[])
 
         const aes128_key* item_key;
         item_key = psp_type == 0x90 ? &key : &ps3_key;
-        get_psp_theme_title(title,item_key, iv, pkg, enc_offset, data_offset);
+        get_psp_theme_title(title, item_key, iv, pkg, enc_offset, data_offset);
 
         //Theme names are prone to having colons
         for (uint32_t i = 0; i < sizeof(title); i++)
@@ -655,6 +664,14 @@ int main(int argc, char* argv[])
             sys_output("[*] unpacking PSX\n");
         }
     }
+    else if (type == PKG_TYPE_PS3)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PSX]%s", title, id, get_region(id), ext);
+        if (verbose)
+        {
+            sys_output("[*] unpacking PS3 PSX\n");
+        }
+    }
     else if (type == PKG_TYPE_VITA_DLC)
     {
         snprintf(root, sizeof(root), "%s [%.9s] [%s] [DLC-%s]%s", title, id, get_region(id), id2, ext);
@@ -698,7 +715,7 @@ int main(int argc, char* argv[])
     else
     {
         assert(0);
-        sys_error("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type %i\n", type);
     }
 
     if (listing && zipped)
@@ -803,10 +820,14 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
     }
+    else if (type == PKG_TYPE_PS3)
+    {
+        snprintf(root, sizeof(root), "pspemu/PSP/GAME");
+    }
     else
     {
         assert(0);
-        sys_error("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type %i\n", type);
     }
 
     char path[1024];
