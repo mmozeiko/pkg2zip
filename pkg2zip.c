@@ -20,6 +20,8 @@
 #define PKG_HEADER_SIZE 192
 #define PKG_HEADER_EXT_SIZE 64
 
+#define VER "2.4"
+
 // https://wiki.henkaku.xyz/vita/Packages#AES_Keys
 static const uint8_t pkg_ps3_key[] = { 0x2e, 0x7b, 0x71, 0xd7, 0xc9, 0xc9, 0xa1, 0x4e, 0xa3, 0x22, 0x1f, 0x18, 0x88, 0x28, 0xb8, 0xf8 };
 static const uint8_t pkg_psp_key[] = { 0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d, 0x2c, 0x33, 0x81, 0x8d, 0x70, 0x9b, 0x60, 0xe6, 0x2b };
@@ -293,6 +295,7 @@ typedef enum {
     PKG_TYPE_PSP,
     PKG_TYPE_PSP_THEME,
     PKG_TYPE_PSX,
+    PKG_TYPE_PS3 // PKG type 1
 } pkg_type;
 
 int main(int argc, char* argv[])
@@ -345,7 +348,7 @@ int main(int argc, char* argv[])
         }
         else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
-            sys_output("pkg2zip v2.3\n");
+            sys_output("pkg2zip v"VER"\n");
             sys_output("\n");
             print_help(argv[0]);
             exit(0);
@@ -375,7 +378,7 @@ int main(int argc, char* argv[])
 
     if (verbose)
     {
-        sys_output("pkg2zip v2.3\n");
+        sys_output("pkg2zip v"VER"\n");
     }
 
     if (verbose)
