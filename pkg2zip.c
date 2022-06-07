@@ -922,7 +922,25 @@ int main(int argc, char* argv[])
                 decrypt = 0;
             }
 
-            if (type == PKG_TYPE_PSX)
+            if (type == PKG_TYPE_PS3) {
+                char game[ZIP_MAX_FILENAME];
+                strncpy(game, &name[0], 9);
+                game[9] = '\0';
+                if (strstr(name, "DOCUMENT.DAT") != NULL) {
+                    sprintf(path, "pspemu/PSP/GAME/%s/DOCUMENT.DAT", game);
+                } else if (strstr(name, "EBOOT.PBP") != NULL) {
+                    sprintf(path, "pspemu/PSP/GAME/%s", game);
+                    out_add_folder(path);
+                    /*
+                    sprintf(path, "pspemu/PSP/GAME/%s/KEYS.BIN", game);
+                    unpack_keys_bin(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    */
+                    sprintf(path, "pspemu/PSP/GAME/%s/EBOOT.PBP", game);
+                } else {
+                    continue;
+                }
+            }
+            else if (type == PKG_TYPE_PSX)
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
