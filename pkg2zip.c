@@ -392,13 +392,16 @@ int main(int argc, char* argv[])
     uint8_t pkg_header[PKG_HEADER_SIZE + PKG_HEADER_EXT_SIZE];
     sys_read(pkg, 0, pkg_header, sizeof(pkg_header));
 
-    if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
+    //if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
+    if (get32be(pkg_header) != 0x7f504b47) // do not check for extended header
     {
         sys_error("ERROR: not a pkg file\n");
     }
 
-    // http://www.psdevwiki.com/ps3/PKG_files
-    uint64_t meta_offset = get32be(pkg_header + 8);
+    // https://www.psdevwiki.com/ps3/PKG_files#Header
+    
+    uint16_t hrd_type = get16be(pkg_header + 6);
+    uint64_t meta_offset = get32be(pkg_header + 8); // why uint64_t?
     uint32_t meta_count = get32be(pkg_header + 12);
     uint32_t item_count = get32be(pkg_header + 20);
     uint64_t total_size = get64be(pkg_header + 24);
@@ -488,7 +491,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        sys_error("ERROR: unsupported content type 0x%x", content_type);
+        sys_error("ERROR: unsupported content type 0x%x\n", content_type);
     }
 
     aes128_key ps3_key;
