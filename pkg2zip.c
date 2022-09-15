@@ -259,17 +259,18 @@ static const char* get_region(const char* id) {
              memcmp(id, "NPPA", 4) == 0) { // PSM JPN
         return "JPN";
     }
-    else if (memcmp(id, "NPUF", 4) == 0 || memcmp(id, "NPUH", 4) == 0 || // PS1 USA
+    else if (memcmp(id, "NPUF", 4) == 0 || // PS1 USA
              memcmp(id, "NPUI", 4) == 0 || memcmp(id, "NPUJ", 4) == 0 || // PS1 USA
              memcmp(id, "PCSA", 4) == 0 || memcmp(id, "PCSE", 4) == 0 || // PSV USA
              memcmp(id, "UCUS", 4) == 0 || memcmp(id, "ULUS", 4) == 0 || // PSP USA
+             memcmp(id, "NPUH", 4) == 0 || // PSP USA
              memcmp(id, "NPNA", 4) == 0) { // PSM USA
         return "USA";
     }
     else if (memcmp(id, "UCKS", 4) == 0 || memcmp(id, "ULKS", 4) == 0) { // PSP KOR
         return "KOR";
     }
-    else if (memcmp(id, "PCSI", 4) == 0) { // PSV INT
+    else if (memcmp(id, "PCSI", 4) == 0 || memcmp(id, "NPXS", 4) == 0) { // PSV INT
         return "INT";
     }
     else {
