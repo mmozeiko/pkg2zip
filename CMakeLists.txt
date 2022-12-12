@@ -17,6 +17,25 @@ pkg2zip_zrif.c
 puff.c
 )
 
+add_custom_target(python_converters ALL DEPENDS 
+${CMAKE_CURRENT_BINARY_DIR}/rif2zrif.py
+${CMAKE_CURRENT_BINARY_DIR}/zrif2rif.py
+)
+add_custom_command(OUTPUT 
+${CMAKE_CURRENT_BINARY_DIR}/rif2zrif.py
+${CMAKE_CURRENT_BINARY_DIR}/zrif2rif.py
+
+    COMMAND ${CMAKE_COMMAND} -E copy 
+    ${CMAKE_CURRENT_SOURCE_DIR}/rif2zrif.py
+    ${CMAKE_CURRENT_BINARY_DIR}/rif2zrif.py
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_CURRENT_SOURCE_DIR}/zrif2rif.py
+    ${CMAKE_CURRENT_BINARY_DIR}/zrif2rif.py
+
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/rif2zrif.py
+    ${CMAKE_CURRENT_SOURCE_DIR}/zrif2rif.py
+)
+
 if(HARDWARE_ACCELERATION)
     if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL x86 OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL x86_64)
         set(HARDWARE_ACCELERATION_SOURCE_FILES
