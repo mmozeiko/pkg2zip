@@ -20,6 +20,8 @@
 #define PKG_HEADER_SIZE 192
 #define PKG_HEADER_EXT_SIZE 64
 
+#define VER "2.5-alpha"
+
 // https://wiki.henkaku.xyz/vita/Packages#AES_Keys
 static const uint8_t pkg_ps3_key[] = { 0x2e, 0x7b, 0x71, 0xd7, 0xc9, 0xc9, 0xa1, 0x4e, 0xa3, 0x22, 0x1f, 0x18, 0x88, 0x28, 0xb8, 0xf8 };
 static const uint8_t pkg_psp_key[] = { 0x07, 0xf2, 0xc6, 0x82, 0x90, 0xb5, 0x0d, 0x2c, 0x33, 0x81, 0x8d, 0x70, 0x9b, 0x60, 0xe6, 0x2b };
@@ -236,33 +238,43 @@ static void find_psp_sfo(const aes128_key* key, const aes128_key* ps3_key, const
     }
 }
 
-static const char* get_region(const char* id)
-{
-    if (memcmp(id, "PCSE", 4) == 0 || memcmp(id, "PCSA", 4) == 0 ||
-        memcmp(id, "NPNA", 4) == 0)
-    {
-        return "USA";
-    }
-    else if (memcmp(id, "PCSF", 4) == 0 || memcmp(id, "PCSB", 4) == 0 ||
-             memcmp(id, "NPOA", 4) == 0)
-    {
+static const char* get_region(const char* id) {
+    if (memcmp(id, "NPEE", 4) == 0 || memcmp(id, "NPEF", 4) == 0 || // PS1 EUR
+        memcmp(id, "PCSB", 4) == 0 || memcmp(id, "PCSF", 4) == 0 || // PSV EUR
+        memcmp(id, "UCES", 4) == 0 || memcmp(id, "ULES", 4) == 0 || // PSP EUR
+        memcmp(id, "NPOA", 4) == 0) { // PSM EUR
         return "EUR";
     }
-    else if (memcmp(id, "PCSC", 4) == 0 || memcmp(id, "VCJS", 4) == 0 || 
-             memcmp(id, "PCSG", 4) == 0 || memcmp(id, "VLJS", 4) == 0 ||
-             memcmp(id, "VLJM", 4) == 0 || memcmp(id, "NPPA", 4) == 0)
-    {
-        return "JPN";
-    }
-    else if (memcmp(id, "VCAS", 4) == 0 || memcmp(id, "PCSH", 4) == 0 ||
-             memcmp(id, "VLAS", 4) == 0 || memcmp(id, "PCSD", 4) == 0 ||
-             memcmp(id, "NPQA", 4) == 0)
-    {
+    else if (memcmp(id, "NPHI", 4) == 0 || memcmp(id, "NPHJ", 4) == 0 || // PS1 ASA
+             memcmp(id, "PCSD", 4) == 0 || memcmp(id, "PCSH", 4) == 0 || // PSV ASA
+             memcmp(id, "UCAS", 4) == 0 || memcmp(id, "ULAS", 4) == 0 || // PSP ASA
+             memcmp(id, "NPQA", 4) == 0) { // PSM ASA
         return "ASA";
     }
-    else
-    {
-        return "unknown region";
+    else if (memcmp(id, "NPJI", 4) == 0 || memcmp(id, "NPJJ", 4) == 0 || // PS1 JPN
+             memcmp(id, "PCSC", 4) == 0 || memcmp(id, "PCSG", 4) == 0 || // PSV JPN
+             memcmp(id, "UCJM", 4) == 0 || memcmp(id, "ULJM", 4) == 0 || // PSP JPN
+             memcmp(id, "UCJS", 4) == 0 || memcmp(id, "ULJS", 4) == 0 || // PSP JPN
+             memcmp(id, "UCJB", 4) == 0 || // PSP JPN
+             memcmp(id, "NPPA", 4) == 0) { // PSM JPN
+        return "JPN";
+    }
+    else if (memcmp(id, "NPUF", 4) == 0 || // PS1 USA
+             memcmp(id, "NPUI", 4) == 0 || memcmp(id, "NPUJ", 4) == 0 || // PS1 USA
+             memcmp(id, "PCSA", 4) == 0 || memcmp(id, "PCSE", 4) == 0 || // PSV USA
+             memcmp(id, "UCUS", 4) == 0 || memcmp(id, "ULUS", 4) == 0 || // PSP USA
+             memcmp(id, "NPUH", 4) == 0 || // PSP USA
+             memcmp(id, "NPNA", 4) == 0) { // PSM USA
+        return "USA";
+    }
+    else if (memcmp(id, "UCKS", 4) == 0 || memcmp(id, "ULKS", 4) == 0) { // PSP KOR
+        return "KOR";
+    }
+    else if (memcmp(id, "PCSI", 4) == 0 || memcmp(id, "NPXS", 4) == 0) { // PSV INT
+        return "INT";
+    }
+    else {
+        return "UNK";
     }
 }
 
@@ -293,6 +305,7 @@ typedef enum {
     PKG_TYPE_PSP,
     PKG_TYPE_PSP_THEME,
     PKG_TYPE_PSX,
+    PKG_TYPE_PS3 // PKG type 1
 } pkg_type;
 
 int main(int argc, char* argv[])
@@ -345,7 +358,7 @@ int main(int argc, char* argv[])
         }
         else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
         {
-            sys_output("pkg2zip v2.3\n");
+            sys_output("pkg2zip v"VER"\n");
             sys_output("\n");
             print_help(argv[0]);
             exit(0);
@@ -375,7 +388,7 @@ int main(int argc, char* argv[])
 
     if (verbose)
     {
-        sys_output("pkg2zip v2.3\n");
+        sys_output("pkg2zip v"VER"\n");
     }
 
     if (verbose)
@@ -389,13 +402,16 @@ int main(int argc, char* argv[])
     uint8_t pkg_header[PKG_HEADER_SIZE + PKG_HEADER_EXT_SIZE];
     sys_read(pkg, 0, pkg_header, sizeof(pkg_header));
 
-    if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
+    //if (get32be(pkg_header) != 0x7f504b47 || get32be(pkg_header + PKG_HEADER_SIZE) != 0x7F657874)
+    if (get32be(pkg_header) != 0x7f504b47) // do not check for extended header
     {
         sys_error("ERROR: not a pkg file\n");
     }
 
-    // http://www.psdevwiki.com/ps3/PKG_files
-    uint64_t meta_offset = get32be(pkg_header + 8);
+    // https://www.psdevwiki.com/ps3/PKG_files#Header
+    
+    uint16_t hdr_type = get16be(pkg_header + 6);
+    uint64_t meta_offset = get32be(pkg_header + 8); // why uint64_t?
     uint32_t meta_count = get32be(pkg_header + 12);
     uint32_t item_count = get32be(pkg_header + 20);
     uint64_t total_size = get64be(pkg_header + 24);
@@ -454,7 +470,11 @@ int main(int argc, char* argv[])
     pkg_type type;
 
     // http://www.psdevwiki.com/ps3/PKG_files
-    if (content_type == 6)
+    if (content_type == 1)
+    {
+        type = PKG_TYPE_PS3;
+    }
+    else if (content_type == 6)
     {
         type = PKG_TYPE_PSX;
     }
@@ -485,7 +505,7 @@ int main(int argc, char* argv[])
     }
     else
     {
-        sys_error("ERROR: unsupported content type 0x%x", content_type);
+        sys_error("ERROR: unsupported content type 0x%x\n", content_type);
     }
 
     aes128_key ps3_key;
@@ -506,6 +526,11 @@ int main(int argc, char* argv[])
         aes128_key key;
         aes128_init(&key, pkg_vita_3);
         aes128_ecb_encrypt(&key, iv, main_key);
+    }
+    else if ((key_type == 4) && (hdr_type == 1)) // PKG_TYPE_PS3
+    {
+        memcpy(main_key, pkg_ps3_key, sizeof(main_key));
+        aes128_init(&ps3_key, pkg_ps3_key);
     }
     else if (key_type == 4)
     {
@@ -530,7 +555,12 @@ int main(int argc, char* argv[])
     uint8_t rif[1024];
     uint32_t rif_size = 0;
 
-    if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
+    if (type == PKG_TYPE_PS3) {
+        // there is no PARAM.SFO inside
+        id = (char*)pkg_header + 0x37;
+        sprintf(title, "%s", id);
+    }
+    else if (type == PKG_TYPE_PSP || type == PKG_TYPE_PSX)
     {
         find_psp_sfo(&key, &ps3_key, iv, pkg, pkg_size, enc_offset, items_offset, item_count, category, title);
         id = (char*)pkg_header + 0x37;
@@ -543,7 +573,6 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_PSP_THEME)
     {
-
         id = (char*)pkg_header + 0x37;
         memcpy(title, pkg_header + 0x44, 0x10);
 
@@ -564,7 +593,7 @@ int main(int argc, char* argv[])
 
         const aes128_key* item_key;
         item_key = psp_type == 0x90 ? &key : &ps3_key;
-        get_psp_theme_title(title,item_key, iv, pkg, enc_offset, data_offset);
+        get_psp_theme_title(title, item_key, iv, pkg, enc_offset, data_offset);
 
         //Theme names are prone to having colons
         for (uint32_t i = 0; i < sizeof(title); i++)
@@ -639,10 +668,18 @@ int main(int argc, char* argv[])
     }
     else if (type == PKG_TYPE_PSX)
     {
-        snprintf(root, sizeof(root), "%s [%.9s] [PSX]%s", title, id, ext);
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PSX]%s", title, id, get_region(id), ext);
         if (verbose)
         {
             sys_output("[*] unpacking PSX\n");
+        }
+    }
+    else if (type == PKG_TYPE_PS3)
+    {
+        snprintf(root, sizeof(root), "%s [%.9s] [%s] [PSX]%s", title, id, get_region(id), ext);
+        if (verbose)
+        {
+            sys_output("[*] unpacking PS3 PSX\n");
         }
     }
     else if (type == PKG_TYPE_VITA_DLC)
@@ -688,7 +725,7 @@ int main(int argc, char* argv[])
     else
     {
         assert(0);
-        sys_error("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type %i\n", type);
     }
 
     if (listing && zipped)
@@ -701,10 +738,12 @@ int main(int argc, char* argv[])
         sys_error("ERROR: Listing option without creating zip is useless\n");
     }
 
-
     if (verbose)
     {
-        sys_output("[*] creating '%s' archive\n", root);
+        if (zipped)
+            sys_output("[*] creating '%s' archive\n", root);
+        else
+            sys_output("[*] unpacking '%s' to directory\n", root);
     }
 
     out_begin(root, zipped);
@@ -793,10 +832,14 @@ int main(int argc, char* argv[])
         sys_vstrncat(root, sizeof(root), "/%.9s", id);
         out_add_folder(root);
     }
+    else if (type == PKG_TYPE_PS3)
+    {
+        snprintf(root, sizeof(root), "pspemu/PSP/GAME");
+    }
     else
     {
         assert(0);
-        sys_error("ERROR: unsupported type\n");
+        sys_error("ERROR: unsupported type %i\n", type);
     }
 
     char path[1024];
@@ -889,7 +932,23 @@ int main(int argc, char* argv[])
                 decrypt = 0;
             }
 
-            if (type == PKG_TYPE_PSX)
+            if (type == PKG_TYPE_PS3) {
+                char game[10]; // ABCD12345
+                strncpy(game, &name[0], 9);
+                game[9] = '\0';
+                if (strstr(name, "DOCUMENT.DAT") != NULL) {
+                    sprintf(path, "pspemu/PSP/GAME/%s/DOCUMENT.DAT", game);
+                } else if (strstr(name, "EBOOT.PBP") != NULL) {
+                    sprintf(path, "pspemu/PSP/GAME/%s", game);
+                    out_add_folder(path);
+                    sprintf(path, "pspemu/PSP/GAME/%s/KEYS.BIN", game);
+                    unpack_keys_bin(path, item_key, iv, pkg, enc_offset, data_offset, data_size);
+                    sprintf(path, "pspemu/PSP/GAME/%s/EBOOT.PBP", game);
+                } else {
+                    continue;
+                }
+            }
+            else if (type == PKG_TYPE_PSX)
             {
                 if (strcmp("USRDIR/CONTENT/DOCUMENT.DAT", name) == 0)
                 {
@@ -1029,7 +1088,10 @@ int main(int argc, char* argv[])
 
     if (verbose)
     {
-        sys_output("[*] unpacking completed\n");
+        if (zipped)
+            sys_output("[*] creating completed\n");
+        else
+            sys_output("[*] unpacking completed\n");
     }
 
     if (type == PKG_TYPE_VITA_APP || type == PKG_TYPE_VITA_DLC || type == PKG_TYPE_VITA_PATCH || type == PKG_TYPE_VITA_THEME)
