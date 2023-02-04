@@ -2,17 +2,19 @@
 
 [![Travis CI Build Status][img_travis]][travis] [![AppVeyor Build Status][img_appveyor]][appveyor] [![Downloads][img_downloads]][downloads] [![Release][img_latest]][latest] [![License][img_license]][license]
 
-Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
+Utility that decrypts PlayStation Vita pkg file and creates zip package. Supported pkg files - main application, DLC, patch, theme and PSM files. Also supports PSX and PSP pkg files for use with [Adrenaline][].
 
 Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string. You must provide license key.
 
 # Requirements
 
 * [Henkaku][] / [Enso][]
+* [Enso][] for Vita Theme installation via bgdl.
 * [NoNpDrm][]
 * [NoPsmDrm][] for PSM titles
 * [VitaShell][] **v1.76** or newer required for DLC installation
 * [Adrenaline][] for PSX or PSP titles
+* [npdrm_free][] for PSP titles in eboot format.
 
 # Features
 
@@ -21,11 +23,10 @@ Optionally writes [NoNpDrm][] or [NoPsmDrm][] fake license file from zRIF string
 * **fast**, uses AESNI hardware accelerated AES decryption if supported by CPU (requires [AESNI][] and [SSSE3][] instructions).
 * **simple**, creates zip package with same folder structure that Vita expects (just drag & drop all file from zip archive to ux0:). Zip file is created directly from pkg without any intermediate temporary files.
 * **Vita DLC**, **Vita PATCH** and **PSM** pkg unpacking.
-* **PSX** and **PSP** pkg unpacking.
+* **PSX**, **PSP**, **PSP Updates**, **PSP DLC**, and **PSP THEME** pkg unpacking.
 
 Limitations:
 
-* no PSP DLC pkg files are supported.
 * no actual title name is extracted for PSM pkg files.
 
 # Usage
@@ -50,9 +51,13 @@ To avoid zipping process and create individual files, use `-x` argument (must co
 
     pkg2zip -x package.pkg [zRIF_STRING]
 
+To disable bgdl output for VITA Theme extraction, use the '-b' argument.
+
+    pkg2zip -b -x package.pkg zRIF_STRING
+
 PSX or PSP pkg files do not require zRIF argument. It will be ignored.
 
-For PSP files pkg2zip by default will create .ISO file. To create compressed .CSO file pass -cN argument where N is compression factor. For example, for fastest compression use:
+For PSP files pkg2zip by default will create a .ISO file. To create a compressed .CSO file pass -cN argument where N is compression factor. For example, for fastest compression use:
 
     pkg2zip -c1 package.pkg
 
@@ -63,6 +68,11 @@ To create smaller cso file (more compression will require more time) use -c9, or
 You can combine -cN argument together with -x:
 
     pkg2zip -x -c9 package.pkg
+
+To extract PSP files in their original EBOOT.PBP format use the '-p' argument: 
+
+    pkg2zip -p package.pkg
+Note: On PSP hardware titles with DLC should be kept in ISO/CSO format due to limitations on the CFW NoDRM Engine.
 
 # Generating zRIF string
 
@@ -93,7 +103,8 @@ If this repository is enabled, just install pkg2zip with zypper.
 
 # Building
 
-Execute `make` if you are on GNU/Linux or macOS.
+Execute `make` if you are on GNU/Linux or macOS (gcc comiler required)
+To install the resulting file use `make install` as root
 
 On Windows you can build either with MinGW (get [MinGW-w64][]) or [Visual Studio 2017 Community Edition][vs2017ce].
 * for MinGW make sure you have make installed, and then execute `mingw32-make`
@@ -113,13 +124,13 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
 
 [travis]: https://travis-ci.org/mmozeiko/pkg2zip/
 [appveyor]: https://ci.appveyor.com/project/mmozeiko/pkg2zip/
-[downloads]: https://github.com/mmozeiko/pkg2zip/releases
-[latest]: https://github.com/mmozeiko/pkg2zip/releases/latest
-[license]: https://github.com/mmozeiko/pkg2zip/blob/master/LICENSE
+[downloads]: https://github.com/lusid1/pkg2zip/releases
+[latest]: https://github.com/lusid1/pkg2zip/releases/latest
+[license]: https://github.com/lusid1/pkg2zip/blob/master/LICENSE
 [img_travis]: https://api.travis-ci.org/mmozeiko/pkg2zip.svg?branch=master
 [img_appveyor]: https://ci.appveyor.com/api/projects/status/xmkl6509ahlp9b7k/branch/master?svg=true
-[img_downloads]: https://img.shields.io/github/downloads/mmozeiko/pkg2zip/total.svg?maxAge=3600
-[img_latest]: https://img.shields.io/github/release/mmozeiko/pkg2zip.svg?maxAge=3600
+[img_downloads]: https://img.shields.io/github/downloads/lusid1/pkg2zip/total.svg?maxAge=3600
+[img_latest]: https://img.shields.io/github/release/lusid1/pkg2zip.svg?maxAge=3600
 [img_license]: https://img.shields.io/github/license/mmozeiko/pkg2zip.svg?maxAge=2592000
 [Adrenaline]: https://github.com/TheOfficialFloW/Adrenaline
 [NoNpDrm]: https://github.com/TheOfficialFloW/NoNpDrm
@@ -132,3 +143,4 @@ Anyone is free to copy, modify, publish, use, compile, sell, or distribute this 
 [AUR]: https://aur.archlinux.org/packages/pkg2zip/
 [MinGW-w64]: http://www.msys2.org/
 [vs2017ce]: https://www.visualstudio.com/vs/community/
+[npdrm_free]: https://github.com/qwikrazor87/npdrm_free

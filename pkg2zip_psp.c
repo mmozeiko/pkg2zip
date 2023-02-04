@@ -311,6 +311,21 @@ static void init_psp_decrypt(aes128_key* key, uint8_t* iv, int eboot, const uint
     }
 }
 
+static void init_psx_keys(uint8_t* iv, const uint8_t* mac, const uint8_t* header, uint32_t offset1)
+{
+    uint8_t tmp[16];
+    memcpy(tmp, header + offset1, 16);
+
+    aes128_key aes;
+    aes128_init_dec(&aes, kirk7_key38);
+    aes128_ecb_decrypt(&aes, tmp, tmp);
+
+    for (size_t i = 0; i < 16; i++)
+    {
+        iv[i] = mac[i] ^ tmp[i] ^ amctl_hashkey_3[i];
+    }
+
+}
 void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size, int cso)
 {
     if (item_size < 0x28)
@@ -380,7 +395,7 @@ void unpack_psp_eboot(const char* path, const aes128_key* pkg_key, const uint8_t
     if (cso)
     {
         cso_size = block_count * iso_block * ISO_SECTOR_SIZE;
-        cso_compress_flags = tdefl_create_comp_flags_from_zip_params(cso, -MZ_DEFAULT_WINDOW_BITS, MZ_DEFAULT_STRATEGY);
+        cso_compress_flags = tdefl_create_comp_flags_from_zip_params(cso, -MZ_DEFAULT_WINDOW_BITS, MZ_FIXED);
 
         uint32_t cso_block_count = (uint32_t)(1 + (cso_size + ISO_SECTOR_SIZE - 1) / ISO_SECTOR_SIZE);
         cso_block = sys_realloc(NULL, cso_block_count * sizeof(uint32_t));
@@ -583,4 +598,195 @@ void unpack_psp_key(const char* path, const aes128_key* pkg_key, const uint8_t* 
     out_begin_file(path, 0);
     out_write(key_header + 0x90, 0x10);
     out_end_file();
+}
+
+void unpack_psp_edat(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+{
+    if (item_size < 0x90 + 0xa0)
+    {
+        sys_error("ERROR: EDAT file is to short!\n");
+    }
+
+    uint8_t item_header[90];
+    sys_read(pkg, enc_offset + item_offset, item_header, sizeof(item_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset) / 16, item_header, sizeof(item_header));
+    uint8_t key_header_offset = item_header[0xC];
+
+    uint8_t key_header[0xa0];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong EDAT header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EDAT file, key/drm type is wrong!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    aes128_key psp_key;
+    uint8_t psp_iv[16];
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x10);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x30, 0x30);
+
+    uint32_t data_size = get32le(key_header + 0x44);
+    uint32_t data_offset = get32le(key_header + 0x4c);
+
+    if (data_offset != 0x90)
+    {
+        sys_error("ERROR: unsupported EDAT file, data offset is wrong!\n");
+    }
+
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
+
+    uint32_t block_size = 0x10;
+    uint32_t block_count = ((data_size + (block_size - 1)) / block_size );
+
+    out_begin_file(path, 0);
+    for (uint32_t i = 0; i < block_count; i++)
+    {
+        uint8_t block[0x10];
+        uint32_t block_offset = (data_offset + (i * block_size)); 
+
+        sys_read(pkg, enc_offset + item_offset + key_header_offset + block_offset, block, block_size);
+        aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset + block_offset)  / 16, block, block_size);
+        aes128_psp_decrypt(&psp_key, psp_iv, i * block_size / 16, block, block_size);
+
+        uint32_t out_size = 0x10;
+        if ( ((i + 1) * block_size) > data_size )
+        {
+            out_size = data_size - (i * block_size);
+        }
+        out_write(block, out_size);
+    }
+    out_end_file();
+}
+
+void unpack_keys_bin(const char* path, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset, uint64_t item_size)
+{
+
+    if (item_size < 0x28 + 0x10 + 0x1f0)
+    {
+        sys_error("ERROR: EBOOT file is to short!\n");
+    }
+
+    uint8_t eboot_header[0x28];
+    sys_read(pkg, enc_offset + item_offset, eboot_header, sizeof(eboot_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, item_offset / 16, eboot_header, sizeof(eboot_header));
+
+    if (memcmp(eboot_header, "\x00PBP", 4) != 0)
+    {
+        sys_error("ERROR: wrong eboot header signature!\n");
+    }
+
+    uint32_t psar_offset = get32le(eboot_header + 0x24);
+
+    if (psar_offset + 16 > item_size)
+    {
+        sys_error("ERROR: eboot file is to short!\n");
+    }
+    assert(psar_offset % 16 == 0);
+
+    uint8_t psar_header[16];
+    sys_read(pkg, enc_offset + item_offset + psar_offset, psar_header, sizeof(psar_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + psar_offset) / 16, psar_header, sizeof(psar_header));
+
+    uint32_t key_header_offset = 0;
+    if (memcmp(psar_header, "PSTITLE", 7) == 0)
+    {
+        key_header_offset = 0x1f0;
+    }
+    else if (memcmp(psar_header, "PSISO", 5) == 0)
+    {
+        key_header_offset = 0x3f0;
+    }
+    else 
+    {
+        sys_error("ERROR: wrong psar header signature!\n");
+    }
+
+    uint8_t key_header[0x90];
+    sys_read(pkg, enc_offset + item_offset + psar_offset+ 16 + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + psar_offset + 16 + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong key header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EBOOT file, key/drm type is unsupported!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    uint8_t keys_bin[16];
+    init_psx_keys(keys_bin, mac, key_header, 0x70);
+
+    out_begin_file(path, 0);
+    out_write(keys_bin, sizeof(keys_bin));
+    out_end_file();
+}
+
+void get_psp_theme_title(char* title, const aes128_key* pkg_key, const uint8_t* pkg_iv, sys_file* pkg, uint64_t enc_offset, uint64_t item_offset)
+{
+    uint8_t item_header[90];
+    sys_read(pkg, enc_offset + item_offset, item_header, sizeof(item_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset) / 16, item_header, sizeof(item_header));
+    uint8_t key_header_offset = item_header[0xC];
+
+    uint8_t key_header[0xa0];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset, key_header, sizeof(key_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset) / 16, key_header, sizeof(key_header));
+
+    if (memcmp(key_header, "\x00PGD", 4) != 0)
+    {
+        sys_error("ERROR: wrong EDAT header signature!\n");
+    }
+
+    uint32_t key_index = get32le(key_header + 4);
+    uint32_t drm_type = get32le(key_header + 8);
+
+    if (key_index != 1 || drm_type != 1)
+    {
+        sys_error("ERROR: unsupported EDAT file, key/drm type is wrong!\n");
+    }
+
+    uint8_t mac[16];
+    aes128_cmac(kirk7_key38, key_header, 0x70, mac);
+
+    aes128_key psp_key;
+    uint8_t psp_iv[16];
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x10);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, key_header + 0x30, 0x30);
+
+    uint32_t data_offset = get32le(key_header + 0x4c);
+
+    uint8_t theme_header[256];
+    sys_read(pkg, enc_offset + item_offset + key_header_offset + data_offset, theme_header, sizeof(theme_header));
+    aes128_ctr_xor(pkg_key, pkg_iv, (item_offset + key_header_offset + data_offset)/ 16, theme_header, sizeof(theme_header));
+
+    init_psp_decrypt(&psp_key, psp_iv, 0, mac, key_header, 0x70, 0x30);
+    aes128_psp_decrypt(&psp_key, psp_iv, 0, theme_header, sizeof(theme_header));
+
+    if (memcmp(theme_header, "\x00PTF", 4) != 0)
+    {
+        sys_error("ERROR: wrong PTF header signature!\n");
+    }
+
+    memcpy(title,theme_header+8, 128);
+    title[128]=0;
 }

@@ -27,3 +27,5 @@ void sys_write(sys_file file, uint64_t offset, const void* buffer, uint32_t size
 void* sys_realloc(void* ptr, size_t size);
 
 void sys_vstrncat(char* dst, size_t n, const char* format, ...);
+
+int sys_test_dir(const char* const path);
